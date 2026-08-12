@@ -55,6 +55,21 @@ BarWidget {
     if ("hostWidget" in target) target.hostWidget = root
   }
 
+  // Bar framework panel contract — required for proper open/close coordination
+  readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+
+  function open() {
+    if (panelLoader.item) panelLoader.item.open()
+  }
+
+  function close() {
+    if (panelLoader.item) panelLoader.item.close()
+  }
+
+  function togglePanel() {
+    if (panelLoader.item) panelLoader.item.toggle()
+  }
+
   onBarChanged: injectPanel()
 
   Loader {
@@ -67,11 +82,6 @@ BarWidget {
       Qt.callLater(root.injectPanel)
     }
   }
-
-  function togglePanel() {
-    if (panelLoader.item) panelLoader.item.toggle()
-  }
-
   WidgetButton {
     id: button
     anchors.fill: parent
