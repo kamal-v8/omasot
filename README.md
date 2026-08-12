@@ -12,7 +12,7 @@ A lightweight screen time tracker plugin for the [Omarchy](https://omarchy.org/)
 
 ## Screenshot
 
-<!-- Add a preview.png to the repo root for the marketplace card -->
+![omasot screen time tracker](preview.png)
 
 ## Requirements
 
