@@ -62,7 +62,7 @@ rm ~/.local/state/screentime.json
 1. A background **service** runs a 60-second timer. Each tick, it checks your idle status via Quickshell's `IdleMonitor`. It then calls `tracker.py record` to log one minute.
 2. The **bar widget** calls `tracker.py` (no args) every 60 seconds to read today's total and display it.
 3. Clicking the widget opens a **panel** with a 24-hour bar chart showing minutes per hour.
-4. The panel includes a toggle button in the top right to switch between "Active" tracking (pauses when your system is idle for 60 seconds) and "Always" tracking (records continuously as long as your laptop is awake).
+4. A toggle in the panel switches between **Active** (monitors only active use cases, pausing when idle) and **Always** (tracks all screen-on usage).
 5. Data is stored in `~/.local/state/screentime.json` as a simple JSON object keyed by date and hour. Entries older than 30 days are pruned automatically.
 
 ## External Dependencies
