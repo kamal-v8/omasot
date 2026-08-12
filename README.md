@@ -68,7 +68,7 @@ rm ~/.local/state/screentime.json
 
 | Dependency | Purpose | Included in Omarchy? |
 |------------|---------|---------------------|
-| Python 3 | Data recording and reading | ✅ Yes |
+| Python 3 | Data recording and reading | Yes |
 
 ## License
 
