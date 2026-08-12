@@ -22,10 +22,12 @@ A lightweight screen time tracker plugin for the [Omarchy](https://omarchy.org/)
 ## Installation
 
 ```bash
-omarchy plugin install omasot
+omarchy plugin add https://github.com/kamal-v8/omasot.git --enable
 ```
 
-Or manually clone this repository into your plugins directory:
+This clones the plugin and enables it in your bar automatically.
+
+Alternatively, you can manually clone and configure:
 
 ```bash
 git clone https://github.com/kamal-v8/omasot.git ~/.config/omarchy/plugins/omasot
