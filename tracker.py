@@ -22,8 +22,14 @@ def save_data(data):
         json.dump(data, f)
     os.replace(tmp_file, STATE_FILE)
 
-def record():
+def record(state="active"):
     data = load_data()
+    mode = data.get("_mode", "active")
+    
+    if state == "idle" and mode == "active":
+        print_today()
+        return
+
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     hour_str = now.strftime("%H")
@@ -37,7 +43,14 @@ def record():
     data[date_str][hour_str] += 1
     # Prune entries older than 30 days
     cutoff = (now - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
-    data = {k: v for k, v in data.items() if k >= cutoff}
+    data = {k: v for k, v in data.items() if k >= cutoff or k == "_mode"}
+    save_data(data)
+    print_today()
+
+def toggle_mode():
+    data = load_data()
+    mode = data.get("_mode", "active")
+    data["_mode"] = "always" if mode == "active" else "active"
     save_data(data)
     print_today()
 
@@ -46,14 +59,19 @@ def print_today():
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     today_data = data.get(date_str, {})
-    total_minutes = sum(today_data.values())
+    total_minutes = sum(v for k, v in today_data.items() if isinstance(v, int))
     print(json.dumps({
         "total_minutes": total_minutes,
-        "today_data": today_data
+        "today_data": today_data,
+        "mode": data.get("_mode", "active")
     }))
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "record":
-        record()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "record":
+            state = sys.argv[2] if len(sys.argv) > 2 else "active"
+            record(state)
+        elif sys.argv[1] == "toggle":
+            toggle_mode()
     else:
         print_today()

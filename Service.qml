@@ -13,6 +13,10 @@ Item {
     respectInhibitors: true
   }
 
+  Process {
+    id: recordProcess
+  }
+
   // Timer to record every minute
   Timer {
     id: recordTimer
@@ -20,15 +24,10 @@ Item {
     repeat: true
     running: true
     onTriggered: {
-      if (!idleMonitor.isIdle) {
-        recordProcess.running = true
-      }
+      var isIdleStr = idleMonitor.isIdle ? "idle" : "active"
+      recordProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record", isIdleStr]
+      recordProcess.running = true
     }
-  }
-
-  Process {
-    id: recordProcess
-    command: ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record"]
   }
 
   Component.onCompleted: console.log("Screentime service started.")

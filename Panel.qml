@@ -52,12 +52,54 @@ Panel {
         anchors.margins: Style.space(24)
         spacing: Style.space(16)
 
-        Text {
-          text: "Screen Time Today"
-          font.family: root.contentFontFamily
-          font.pixelSize: Style.font.body
-          font.bold: true
-          color: Qt.darker(root.contentForeground, 1.2)
+        Item {
+          width: parent.width
+          height: titleText.height
+          
+          Text {
+            id: titleText
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Screen Time Today"
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.body
+            font.bold: true
+            color: Qt.darker(root.contentForeground, 1.2)
+          }
+          
+          Text {
+            id: modeText
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "󰔢 Always" : "󰔡 Active"
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.caption
+            color: mouseArea.containsMouse ? root.contentForeground : Qt.darker(root.contentForeground, 1.2)
+            
+            MouseArea {
+              id: mouseArea
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: toggleProcess.running = true
+            }
+          }
+          
+          Process {
+            id: toggleProcess
+            command: ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "toggle"]
+            stdout: StdioCollector {
+              waitForEnd: true
+              onStreamFinished: {
+                try {
+                  var line = String(text || "").trim()
+                  if (!line) return
+                  var data = JSON.parse(line)
+                  if (hostWidget) hostWidget.screentimeData = data
+                } catch(e) {}
+              }
+            }
+          }
         }
 
         Text {
