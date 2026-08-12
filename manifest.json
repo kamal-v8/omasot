@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "omasot",
+  "name": "Screen Time",
+  "version": "1.0.0",
+  "author": "kamal",
+  "description": "Screen time tracker and chart",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Screen Time",
+    "description": "Shows today's screen on time",
+    "category": "System",
+    "allowMultiple": false
+  }
+}
