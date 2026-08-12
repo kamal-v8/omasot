@@ -16,6 +16,7 @@ BarWidget {
   property string displayText: (totalMinutes === 0) ? "0m" : ((Math.floor(totalMinutes / 60) > 0 ? Math.floor(totalMinutes / 60) + "h " : "") + (totalMinutes % 60) + "m")
 
   function refresh() {
+    if (readProcess.running) readProcess.running = false
     readProcess.running = true
   }
 
