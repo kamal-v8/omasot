@@ -86,7 +86,6 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    foreground: "#FFFFFF"
     text: "󰄉 " + root.displayText
     labelVisible: !root.vertical
     hasVisualContent: true
