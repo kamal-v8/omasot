@@ -6,7 +6,7 @@ A lightweight screen time tracker plugin for the [Omarchy](https://omarchy.org/)
 
 - **Bar widget** — displays total screen time today (e.g. `2h 34m`)
 - **Hourly chart** — click the widget to see a 24-hour bar chart of usage
-- **Tracking Modes** — easily toggle between "Active" (measures only actively used time) and "Always" (measures total screen-on time, whether being used or unused)
+- **Tracking Modes** — use the mode switch in the panel to switch between "Active" (measures only actively used time) and "Always" (measures total screen-on time, whether being used or unused)
 - **Theme-aware** — adapts colors to your current Omarchy theme
 - **Lightweight** — simple Python backend, no daemons or databases
 
@@ -30,25 +30,31 @@ This clones the plugin and enables it in your bar automatically.
 Alternatively, you can manually clone and configure:
 
 ```bash
-git clone https://github.com/kamal-v8/omasot.git ~/.config/omarchy/plugins/omasot
+git clone https://github.com/kamal-v8/omasot.git ~/.config/omarchy/plugins/io.github.kamal-v8.omasot
 ```
 
 Then add it to your bar in `~/.config/omarchy/shell.json`:
 
 ```json
 {
-  "id": "omasot"
+  "id": "io.github.kamal-v8.omasot"
 }
 ```
 
 The shell hot-reloads on save — no restart needed.
 
+## Usage
+
+Click the widget to open the details panel. Press Escape to close it. Click the
+mode switch in the top-right of the panel to switch between `Active` and
+`Always` tracking.
+
 ## Removal
 
-Remove from your bar layout in `~/.config/omarchy/shell.json`, then delete the plugin:
+Remove from your bar layout in `~/.config/omarchy/shell.json`, then remove the plugin:
 
 ```bash
-rm -rf ~/.config/omarchy/plugins/omasot
+omarchy plugin remove io.github.kamal-v8.omasot
 ```
 
 Optionally remove the state file:
@@ -62,8 +68,8 @@ rm ~/.local/state/screentime.json
 1. A background **service** runs a 60-second timer. Each tick, it checks your idle status via Quickshell's `IdleMonitor`. It then calls `tracker.py record` to log one minute.
 2. The **bar widget** calls `tracker.py` (no args) every 60 seconds to read today's total and display it.
 3. Clicking the widget opens a **panel** with a 24-hour bar chart showing minutes per hour.
-4. A toggle in the panel switches between **Active** (monitors only active use cases, pausing when idle) and **Always** (tracks all screen-on usage).
-5. Data is stored in `~/.local/state/screentime.json` as a simple JSON object keyed by date and hour. Entries older than 30 days are pruned automatically.
+4. The mode switch in the panel switches between **Active** (monitors only active use cases, pausing when idle) and **Always** (tracks all screen-on usage).
+5. Data is stored in `~/.local/state/screentime.json` as a simple JSON object keyed by date and hour. Entries older than 30 days are pruned automatically. No network access, no elevated privileges.
 
 ## External Dependencies
 

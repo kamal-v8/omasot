@@ -6,7 +6,7 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "omasot"
+  moduleName: "io.github.kamal-v8.omasot"
   manageIpc: false
 
   property var anchorItem: null
@@ -55,8 +55,8 @@ Panel {
 
         Item {
           width: parent.width
-          height: titleText.height
-          
+          height: Math.max(titleText.height, modeRow.height)
+
           Text {
             id: titleText
             anchors.left: parent.left
@@ -67,25 +67,37 @@ Panel {
             font.bold: true
             color: Qt.darker(root.contentForeground, 1.2)
           }
-          
-          Text {
-            id: modeText
+
+          Row {
+            id: modeRow
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "󰔢 Always" : "󰔡 Active"
-            font.family: root.contentFontFamily
-            font.pixelSize: Style.font.caption
-            color: mouseArea.containsMouse ? root.contentForeground : Qt.darker(root.contentForeground, 1.2)
-            
-            MouseArea {
-              id: mouseArea
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: toggleProcess.running = true
+            spacing: Style.space(8)
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Always" : "Active"
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.caption
+              color: Qt.darker(root.contentForeground, 1.2)
+            }
+
+            ToggleSwitch {
+              id: modeSwitch
+              anchors.verticalCenter: parent.verticalCenter
+              checked: hostWidget ? hostWidget.screentimeData.mode === "always" : false
+              busy: toggleProcess.running
+              foreground: root.contentForeground
+              onToggled: toggleProcess.running = true
+            }
+
+            PanelToolTip {
+              visible: modeSwitch.containsMouse
+              text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Tracking all screen-on time. Click to track active use only." : "Tracking active use only. Click to track all screen-on time."
+              fontFamily: root.contentFontFamily
             }
           }
-          
+
           Process {
             id: toggleProcess
             command: ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "toggle"]

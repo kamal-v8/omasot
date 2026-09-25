@@ -1,9 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "omasot",
+  "id": "io.github.kamal-v8.omasot",
   "name": "Screen Time",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "kamal",
+  "license": "MIT",
   "description": "Screen time tracker and chart",
   "kinds": [
     "service",
@@ -18,6 +19,7 @@
     "displayName": "Screen Time",
     "description": "Shows today's screen on time",
     "category": "System",
-    "allowMultiple": false
+    "allowMultiple": false,
+    "defaultSection": "center"
   }
 }
