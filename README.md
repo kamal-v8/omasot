@@ -30,14 +30,14 @@ This clones the plugin and enables it in your bar automatically.
 Alternatively, you can manually clone and configure:
 
 ```bash
-git clone https://github.com/kamal-v8/omasot.git ~/.config/omarchy/plugins/io.github.kamal-v8.omasot
+git clone https://github.com/kamal-v8/omasot.git ~/.config/omarchy/plugins/omasot
 ```
 
 Then add it to your bar in `~/.config/omarchy/shell.json`:
 
 ```json
 {
-  "id": "io.github.kamal-v8.omasot"
+  "id": "omasot"
 }
 ```
 
@@ -54,7 +54,7 @@ mode switch in the top-right of the panel to switch between `Active` and
 Remove from your bar layout in `~/.config/omarchy/shell.json`, then remove the plugin:
 
 ```bash
-omarchy plugin remove io.github.kamal-v8.omasot
+omarchy plugin remove omasot
 ```
 
 Optionally remove the state file:

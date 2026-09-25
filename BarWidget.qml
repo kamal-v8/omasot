@@ -6,7 +6,7 @@ import qs.Ui
 
 BarWidget {
   id: root
-  moduleName: "io.github.kamal-v8.omasot"
+  moduleName: "omasot"
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight

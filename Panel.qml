@@ -6,7 +6,7 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "io.github.kamal-v8.omasot"
+  moduleName: "omasot"
   manageIpc: false
 
   property var anchorItem: null
