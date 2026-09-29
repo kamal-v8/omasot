@@ -6,6 +6,7 @@ A lightweight screen time tracker plugin for the [Omarchy](https://omarchy.org/)
 
 - **Bar widget** — displays total screen time today (e.g. `2h 34m`)
 - **Hourly chart** — click the widget to see a 24-hour bar chart of usage
+- **Weekly stats** — expand the "This week" dropdown for a 7-day breakdown; hide it anytime from the settings (gear) section
 - **Tracking Modes** — use the mode switch in the panel to switch between "Active" (measures only actively used time) and "Always" (measures total screen-on time, whether being used or unused)
 - **Theme-aware** — adapts colors to your current Omarchy theme
 - **Lightweight** — simple Python backend, no daemons or databases

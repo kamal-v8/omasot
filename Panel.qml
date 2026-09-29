@@ -16,6 +16,19 @@ Panel {
   property var todayData: hostWidget ? (hostWidget.screentimeData.today_data || ({})) : ({})
   property int maxMinutes: Math.max(60, Object.values(todayData).reduce(function(a, b) { return Math.max(a, b) }, 0))
 
+  property var weekData: hostWidget ? (hostWidget.screentimeData.week_data || []) : []
+  property int weekTotal: hostWidget ? (hostWidget.screentimeData.week_total || 0) : 0
+  property int weekMaxMinutes: Math.max(60, weekData.reduce(function(a, d) { return Math.max(a, d.minutes || 0) }, 0))
+  property bool showWeekly: hostWidget ? hostWidget.screentimeData.show_weekly !== false : true
+  property bool weeklyExpanded: false
+  property bool settingsExpanded: false
+
+  function formatMinutes(m) {
+    if (!m) return "0m"
+    var h = Math.floor(m / 60)
+    return (h > 0 ? h + "h " : "") + (m % 60) + "m"
+  }
+
   readonly property color contentForeground: bar ? bar.foreground : Color.foreground
   readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
 
@@ -41,7 +54,7 @@ Panel {
     open: root.opened
     centerOnBar: true
     contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(Style.space(260))
+    contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -49,6 +62,7 @@ Panel {
       onCloseRequested: root.close()
 
       Column {
+        id: content
         anchors.fill: parent
         anchors.margins: Style.space(24)
         spacing: Style.space(16)
@@ -183,6 +197,136 @@ Panel {
                 font.pixelSize: Style.font.caption
                 color: Qt.darker(root.contentForeground, 1.5)
               }
+            }
+          }
+        }
+
+        Button {
+          id: weeklyButton
+          width: parent.width
+          visible: root.showWeekly
+          leftAlign: true
+          text: "This week · " + root.formatMinutes(root.weekTotal)
+          iconText: "󰅀"
+          iconRotation: root.weeklyExpanded ? 180 : 0
+          tooltipText: root.weeklyExpanded ? "Hide the 7-day breakdown" : "Show the 7-day breakdown"
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+          fontSize: Style.font.caption
+          onClicked: root.weeklyExpanded = !root.weeklyExpanded
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.showWeekly && root.weeklyExpanded
+
+          Item {
+            width: parent.width
+            height: Style.space(80)
+
+            Row {
+              anchors.fill: parent
+              spacing: Style.space(4)
+
+              Repeater {
+                model: root.weekData
+                Item {
+                  required property var modelData
+                  width: (parent.width - (6 * Style.space(4))) / 7
+                  height: parent.height
+
+                  property int minutes: modelData.minutes || 0
+
+                  Rectangle {
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: Math.max(1, (minutes / root.weekMaxMinutes) * parent.height)
+                    color: minutes > 0 ? root.contentForeground : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
+                    radius: Style.cornerRadius > 0 ? width / 2 : 0
+                  }
+
+                  PanelToolTip {
+                    visible: dayMouse.containsMouse
+                    text: modelData.label + " " + modelData.date + " - " + minutes + " min"
+                    fontFamily: root.contentFontFamily
+                  }
+
+                  MouseArea {
+                    id: dayMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                  }
+                }
+              }
+            }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Repeater {
+              model: root.weekData
+              Item {
+                required property var modelData
+                width: (parent.width - (6 * Style.space(4))) / 7
+                height: Style.space(20)
+
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData.label || ""
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.5)
+                }
+              }
+            }
+          }
+        }
+
+        Item {
+          width: parent.width
+          height: settingsButton.height
+
+          Button {
+            id: settingsButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            iconText: "󰒓"
+            tooltipText: root.settingsExpanded ? "Hide settings" : "Show settings"
+            foreground: Qt.darker(root.contentForeground, 1.2)
+            fontFamily: root.contentFontFamily
+            fontSize: Style.font.caption
+            horizontalPadding: Style.spacing.controlGap
+            verticalPadding: Style.spacing.labelGap
+            onClicked: root.settingsExpanded = !root.settingsExpanded
+          }
+        }
+
+        Toggle {
+          width: parent.width
+          visible: root.settingsExpanded
+          label: "Weekly stats"
+          description: "Show the 7-day breakdown section in this panel."
+          checked: root.showWeekly
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+          onClicked: weeklyProcess.running = true
+        }
+
+        Process {
+          id: weeklyProcess
+          command: ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "toggle-weekly"]
+          stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+              try {
+                var line = String(text || "").trim()
+                if (!line) return
+                var data = JSON.parse(line)
+                if (hostWidget) hostWidget.screentimeData = data
+              } catch(e) {}
             }
           }
         }

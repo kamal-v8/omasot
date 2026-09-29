@@ -41,9 +41,9 @@ def record(state="active"):
         data[date_str][hour_str] = 0
         
     data[date_str][hour_str] += 1
-    # Prune entries older than 30 days
+    # Prune entries older than 30 days (keep settings keys)
     cutoff = (now - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
-    data = {k: v for k, v in data.items() if k >= cutoff or k == "_mode"}
+    data = {k: v for k, v in data.items() if k >= cutoff or k in ("_mode", "_settings")}
     save_data(data)
     print_today()
 
@@ -54,16 +54,54 @@ def toggle_mode():
     save_data(data)
     print_today()
 
+def get_settings(data):
+    settings = data.get("_settings", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    return {"show_weekly": settings.get("show_weekly", True)}
+
+def toggle_weekly():
+    data = load_data()
+    settings = data.get("_settings", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    settings["show_weekly"] = not settings.get("show_weekly", True)
+    data["_settings"] = settings
+    save_data(data)
+    print_today()
+
+def get_week_data(data):
+    now = datetime.datetime.now()
+    days = []
+    for i in range(6, -1, -1):
+        day = now - datetime.timedelta(days=i)
+        date_str = day.strftime("%Y-%m-%d")
+        day_data = data.get(date_str, {})
+        if not isinstance(day_data, dict):
+            day_data = {}
+        total = sum(v for v in day_data.values() if isinstance(v, int))
+        days.append({
+            "date": date_str,
+            "label": day.strftime("%a"),
+            "minutes": total,
+        })
+    return days
+
 def print_today():
     data = load_data()
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     today_data = data.get(date_str, {})
     total_minutes = sum(v for k, v in today_data.items() if isinstance(v, int))
+    week_data = get_week_data(data)
+    week_total = sum(d["minutes"] for d in week_data)
     print(json.dumps({
         "total_minutes": total_minutes,
         "today_data": today_data,
-        "mode": data.get("_mode", "active")
+        "mode": data.get("_mode", "active"),
+        "week_data": week_data,
+        "week_total": week_total,
+        "show_weekly": get_settings(data)["show_weekly"],
     }))
 
 if __name__ == "__main__":
@@ -73,5 +111,7 @@ if __name__ == "__main__":
             record(state)
         elif sys.argv[1] == "toggle":
             toggle_mode()
+        elif sys.argv[1] == "toggle-weekly":
+            toggle_weekly()
     else:
         print_today()
