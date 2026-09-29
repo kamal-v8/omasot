@@ -61,11 +61,20 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.close()
 
-      Column {
-        id: content
+      Flickable {
+        id: contentScroll
         anchors.fill: parent
         anchors.margins: Style.space(24)
-        spacing: Style.space(16)
+        contentWidth: width
+        contentHeight: content.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+        Column {
+          id: content
+          width: contentScroll.width
+          spacing: Style.space(16)
 
         Item {
           width: parent.width
@@ -343,6 +352,7 @@ Panel {
               } catch(e) {}
             }
           }
+        }
         }
       }
     }
