@@ -204,7 +204,8 @@ Panel {
                 text: modelData.label || ""
                 font.family: root.contentFontFamily
                 font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.5)
+                font.bold: true
+                color: Qt.darker(root.contentForeground, 1.2)
               }
 
               Text {
@@ -217,6 +218,7 @@ Panel {
                 text: root.formatMinutes(minutes)
                 font.family: root.contentFontFamily
                 font.pixelSize: Style.font.caption
+                font.bold: true
                 color: root.contentForeground
               }
 
