@@ -69,7 +69,7 @@ Panel {
 
         Item {
           width: parent.width
-          height: Math.max(titleText.height, modeRow.height)
+          height: Math.max(titleText.height, modeRow.height, settingsButton.height)
 
           Text {
             id: titleText
@@ -84,7 +84,8 @@ Panel {
 
           Row {
             id: modeRow
-            anchors.right: parent.right
+            anchors.right: settingsButton.left
+            anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(8)
 
@@ -110,6 +111,20 @@ Panel {
               text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Tracking all screen-on time. Click to track active use only." : "Tracking active use only. Click to track all screen-on time."
               fontFamily: root.contentFontFamily
             }
+          }
+
+          Button {
+            id: settingsButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            iconText: "󰒓"
+            tooltipText: root.settingsExpanded ? "Hide settings" : "Show settings"
+            foreground: Qt.darker(root.contentForeground, 1.2)
+            fontFamily: root.contentFontFamily
+            fontSize: Style.font.caption
+            horizontalPadding: Style.spacing.controlGap
+            verticalPadding: Style.spacing.labelGap
+            onClicked: root.settingsExpanded = !root.settingsExpanded
           }
 
           Process {
@@ -248,7 +263,7 @@ Panel {
 
                   PanelToolTip {
                     visible: dayMouse.containsMouse
-                    text: modelData.label + " " + modelData.date + " - " + minutes + " min"
+                    text: modelData.label + " " + modelData.date + " - " + root.formatMinutes(minutes)
                     fontFamily: root.contentFontFamily
                   }
 
@@ -271,36 +286,35 @@ Panel {
               Item {
                 required property var modelData
                 width: (parent.width - (6 * Style.space(4))) / 7
-                height: Style.space(20)
+                height: Style.space(34)
 
-                Text {
-                  anchors.centerIn: parent
-                  text: modelData.label || ""
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
-                  color: Qt.darker(root.contentForeground, 1.5)
+                property int minutes: modelData.minutes || 0
+
+                Column {
+                  width: parent.width
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 0
+
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: modelData.label || ""
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.5)
+                  }
+
+                  Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                    text: root.formatMinutes(minutes)
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.contentForeground
+                  }
                 }
               }
             }
-          }
-        }
-
-        Item {
-          width: parent.width
-          height: settingsButton.height
-
-          Button {
-            id: settingsButton
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            iconText: "󰒓"
-            tooltipText: root.settingsExpanded ? "Hide settings" : "Show settings"
-            foreground: Qt.darker(root.contentForeground, 1.2)
-            fontFamily: root.contentFontFamily
-            fontSize: Style.font.caption
-            horizontalPadding: Style.spacing.controlGap
-            verticalPadding: Style.spacing.labelGap
-            onClicked: root.settingsExpanded = !root.settingsExpanded
           }
         }
 
