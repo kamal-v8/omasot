@@ -18,7 +18,8 @@ Panel {
 
   property var weekData: hostWidget ? (hostWidget.screentimeData.week_data || []) : []
   property int weekTotal: hostWidget ? (hostWidget.screentimeData.week_total || 0) : 0
-  property int weekMaxMinutes: Math.max(60, weekData.reduce(function(a, d) { return Math.max(a, d.minutes || 0) }, 0))
+  // Weekly bars are measured against a full 24-hour day.
+  property int weekMaxMinutes: 24 * 60
   property bool showWeekly: hostWidget ? hostWidget.screentimeData.show_weekly !== false : true
   property bool weeklyExpanded: false
   property bool settingsExpanded: false
@@ -236,7 +237,7 @@ Panel {
                 Rectangle {
                   anchors.left: parent.left
                   anchors.verticalCenter: parent.verticalCenter
-                  width: Math.max(0, (minutes / root.weekMaxMinutes) * parent.width)
+                  width: Math.min(parent.width, Math.max(0, (minutes / root.weekMaxMinutes) * parent.width))
                   height: parent.height
                   color: root.contentForeground
                   radius: height / 2
