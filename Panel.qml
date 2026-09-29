@@ -153,78 +153,6 @@ Panel {
           }
         }
 
-        Text {
-          text: hostWidget ? hostWidget.displayText : "0m"
-          font.family: root.contentFontFamily
-          font.pixelSize: 52
-          font.bold: true
-          color: root.contentForeground
-        }
-
-        Item {
-          width: parent.width
-          height: Style.space(80)
-
-          Row {
-            anchors.fill: parent
-            spacing: Style.space(4)
-
-            Repeater {
-              model: 24
-              Item {
-                required property int index
-                width: (parent.width - (23 * Style.space(4))) / 24
-                height: parent.height
-
-                property string hr: (index < 10 ? "0" : "") + index
-                property int minutes: root.todayData[hr] || 0
-
-                Rectangle {
-                  anchors.bottom: parent.bottom
-                  width: parent.width
-                  height: Math.max(1, (minutes / root.maxMinutes) * parent.height)
-                  color: minutes > 0 ? root.contentForeground : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
-                  radius: Style.cornerRadius > 0 ? width / 2 : 0
-                }
-                
-                PanelToolTip {
-                  visible: mouse.containsMouse
-                  text: index + ":00 - " + minutes + " min"
-                  fontFamily: root.contentFontFamily
-                }
-                
-                MouseArea {
-                  id: mouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                }
-              }
-            }
-          }
-        }
-
-        Row {
-          width: parent.width
-          spacing: Style.space(4)
-
-          Repeater {
-            model: 24
-            Item {
-              required property int index
-              width: (parent.width - (23 * Style.space(4))) / 24
-              height: Style.space(20)
-
-              Text {
-                anchors.centerIn: parent
-                text: index % 4 === 0 ? index : ""
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.5)
-              }
-            }
-          }
-        }
-
         Toggle {
           width: parent.width
           visible: root.settingsExpanded
@@ -334,6 +262,78 @@ Panel {
                     color: root.contentForeground
                   }
                 }
+              }
+            }
+          }
+        }
+
+        Text {
+          text: hostWidget ? hostWidget.displayText : "0m"
+          font.family: root.contentFontFamily
+          font.pixelSize: 52
+          font.bold: true
+          color: root.contentForeground
+        }
+
+        Item {
+          width: parent.width
+          height: Style.space(80)
+
+          Row {
+            anchors.fill: parent
+            spacing: Style.space(4)
+
+            Repeater {
+              model: 24
+              Item {
+                required property int index
+                width: (parent.width - (23 * Style.space(4))) / 24
+                height: parent.height
+
+                property string hr: (index < 10 ? "0" : "") + index
+                property int minutes: root.todayData[hr] || 0
+
+                Rectangle {
+                  anchors.bottom: parent.bottom
+                  width: parent.width
+                  height: Math.max(1, (minutes / root.maxMinutes) * parent.height)
+                  color: minutes > 0 ? root.contentForeground : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
+                  radius: Style.cornerRadius > 0 ? width / 2 : 0
+                }
+                
+                PanelToolTip {
+                  visible: mouse.containsMouse
+                  text: index + ":00 - " + minutes + " min"
+                  fontFamily: root.contentFontFamily
+                }
+                
+                MouseArea {
+                  id: mouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                }
+              }
+            }
+          }
+        }
+
+        Row {
+          width: parent.width
+          spacing: Style.space(4)
+
+          Repeater {
+            model: 24
+            Item {
+              required property int index
+              width: (parent.width - (23 * Style.space(4))) / 24
+              height: Style.space(20)
+
+              Text {
+                anchors.centerIn: parent
+                text: index % 4 === 0 ? index : ""
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                color: Qt.darker(root.contentForeground, 1.5)
               }
             }
           }
