@@ -182,86 +182,79 @@ Panel {
 
         Column {
           width: parent.width
-          spacing: Style.space(8)
+          spacing: Style.space(6)
           visible: root.showWeekly && root.weeklyExpanded
 
-          Item {
-            width: parent.width
-            height: Style.space(80)
+          Repeater {
+            model: root.weekData
 
-            Row {
-              anchors.fill: parent
-              spacing: Style.space(6)
+            Item {
+              required property var modelData
+              width: parent.width
+              height: Style.space(20)
 
-              Repeater {
-                model: root.weekData
-                Item {
-                  required property var modelData
-                  width: (parent.width - (6 * Style.space(6))) / 7
+              property int minutes: modelData.minutes || 0
+
+              Text {
+                id: dayLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: Style.space(34)
+                text: modelData.label || ""
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                color: Qt.darker(root.contentForeground, 1.5)
+              }
+
+              Text {
+                id: valueLabel
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: Style.space(64)
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideRight
+                text: root.formatMinutes(minutes)
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                color: root.contentForeground
+              }
+
+              Item {
+                anchors.left: dayLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: valueLabel.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                height: Style.space(12)
+
+                Rectangle {
+                  anchors.fill: parent
+                  color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
+                  radius: height / 2
+                }
+
+                Rectangle {
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.max(0, (minutes / root.weekMaxMinutes) * parent.width)
                   height: parent.height
-
-                  property int minutes: modelData.minutes || 0
-
-                  Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: Math.max(1, (minutes / root.weekMaxMinutes) * parent.height)
-                    color: minutes > 0 ? root.contentForeground : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
-                    radius: Math.min(Style.space(4), width / 2)
-                  }
-
-                  PanelToolTip {
-                    visible: dayMouse.containsMouse
-                    text: modelData.label + " " + modelData.date + " - " + root.formatMinutes(minutes)
-                    fontFamily: root.contentFontFamily
-                  }
-
-                  MouseArea {
-                    id: dayMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                  }
+                  color: root.contentForeground
+                  radius: height / 2
+                  visible: minutes > 0
                 }
               }
-            }
-          }
 
-          Row {
-            width: parent.width
-            spacing: Style.space(6)
+              PanelToolTip {
+                visible: rowMouse.containsMouse
+                text: modelData.label + " " + modelData.date + " - " + root.formatMinutes(minutes)
+                fontFamily: root.contentFontFamily
+              }
 
-            Repeater {
-              model: root.weekData
-              Item {
-                required property var modelData
-                width: (parent.width - (6 * Style.space(6))) / 7
-                height: Style.space(34)
-
-                property int minutes: modelData.minutes || 0
-
-                Column {
-                  width: parent.width
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: 0
-
-                  Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: modelData.label || ""
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    color: Qt.darker(root.contentForeground, 1.5)
-                  }
-
-                  Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                    text: root.formatMinutes(minutes)
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.contentForeground
-                  }
-                }
+              MouseArea {
+                id: rowMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
               }
             }
           }
