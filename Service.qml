@@ -17,6 +17,10 @@ Item {
     id: recordProcess
   }
 
+  Process {
+    id: appRecordProcess
+  }
+
   // Timer to record every minute
   Timer {
     id: recordTimer
@@ -27,6 +31,21 @@ Item {
       var isIdleStr = idleMonitor.isIdle ? "idle" : "active"
       recordProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record", isIdleStr]
       recordProcess.running = true
+    }
+  }
+
+  // Timer to record per-app usage every 5s
+  Timer {
+    id: appRecordTimer
+    interval: 5000
+    repeat: true
+    running: true
+    onTriggered: {
+      if (appRecordProcess.running)
+        return
+      var isIdleStr = idleMonitor.isIdle ? "idle" : "active"
+      appRecordProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record-app", isIdleStr]
+      appRecordProcess.running = true
     }
   }
 
