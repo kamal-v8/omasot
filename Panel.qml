@@ -188,13 +188,13 @@ Panel {
 
             Row {
               anchors.fill: parent
-              spacing: Style.space(4)
+              spacing: Style.space(6)
 
               Repeater {
                 model: root.weekData
                 Item {
                   required property var modelData
-                  width: (parent.width - (6 * Style.space(4))) / 7
+                  width: (parent.width - (6 * Style.space(6))) / 7
                   height: parent.height
 
                   property int minutes: modelData.minutes || 0
@@ -204,7 +204,7 @@ Panel {
                     width: parent.width
                     height: Math.max(1, (minutes / root.weekMaxMinutes) * parent.height)
                     color: minutes > 0 ? root.contentForeground : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.1)
-                    radius: Style.cornerRadius > 0 ? width / 2 : 0
+                    radius: Math.min(Style.space(4), width / 2)
                   }
 
                   PanelToolTip {
@@ -225,13 +225,13 @@ Panel {
 
           Row {
             width: parent.width
-            spacing: Style.space(4)
+            spacing: Style.space(6)
 
             Repeater {
               model: root.weekData
               Item {
                 required property var modelData
-                width: (parent.width - (6 * Style.space(4))) / 7
+                width: (parent.width - (6 * Style.space(6))) / 7
                 height: Style.space(34)
 
                 property int minutes: modelData.minutes || 0
