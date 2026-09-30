@@ -63,6 +63,17 @@ Column {
     return mm + "m"
   }
 
+  // Compact per-day value for the ~36px label columns: "11.8h", "45m", "0m".
+  // Tooltips keep formatTime ("11h 50m") so precision stays one hover away.
+  function dayHours(sec) {
+    var s = Math.floor(sec || 0)
+    if (s <= 0)
+      return "0m"
+    if (s < 3600)
+      return Math.floor(s / 60) + "m"
+    return (s / 3600).toFixed(1) + "h"
+  }
+
   function refresh() {
     weekProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "apps-week", String(root.weekOffset)]
     if (weekProcess.running)
@@ -120,16 +131,30 @@ Column {
     }
   }
 
-  Text {
-    id: summaryText
-    width: parent.width
-    horizontalAlignment: Text.AlignRight
-    elide: Text.ElideRight
-    text: root.formatTime(root.weekTotal) + " · " + root.weekShare + "%"
-    textFormat: Text.PlainText
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    color: Qt.darker(root.foreground, 1.5)
+  Row {
+    id: summaryRow
+    anchors.right: parent.right
+    spacing: Style.space(4)
+
+    Text {
+      id: summaryText
+      anchors.verticalCenter: parent.verticalCenter
+      elide: Text.ElideRight
+      text: root.formatTime(root.weekTotal) + " · " + root.weekShare + "%"
+      textFormat: Text.PlainText
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      color: Qt.darker(root.foreground, 1.5)
+    }
+
+    PanelActionButton {
+      id: helpButton
+      anchors.verticalCenter: parent.verticalCenter
+      iconText: "?"
+      tooltipText: "Weekly focused-app totals, Monday to Sunday. Click a bar to inspect that day."
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+    }
   }
 
   // ── Bars: one bottom-anchored column per day ────────────────────
@@ -197,18 +222,34 @@ Column {
       Item {
         required property var modelData
         width: (parent.width - (6 * Style.space(4))) / 7
-        height: Style.space(20)
+        height: Style.space(32)
 
         property bool isToday: (modelData.date || "") === root.todayStr && (modelData.date || "") !== ""
+        property int total: modelData.total || 0
 
-        Text {
+        Column {
           anchors.centerIn: parent
-          text: modelData.label || ""
-          textFormat: Text.PlainText
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: isToday
-          color: Qt.darker(root.foreground, 1.5)
+          spacing: 0
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: modelData.label || ""
+            textFormat: Text.PlainText
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: isToday
+            color: Qt.darker(root.foreground, 1.5)
+          }
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.dayHours(total)
+            textFormat: Text.PlainText
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: isToday
+            color: Qt.darker(root.foreground, 1.5)
+          }
         }
 
         MouseArea {

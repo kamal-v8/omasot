@@ -20,6 +20,7 @@ Panel {
   property bool settingsExpanded: false
 
   property bool showApps: hostWidget ? hostWidget.screentimeData.show_apps !== false : true
+  property bool showAppIcons: hostWidget ? hostWidget.screentimeData.show_app_icons !== false : true
   property string appMode: hostWidget ? (hostWidget.screentimeData.app_mode || "class") : "class"
   property int retentionDays: hostWidget ? (hostWidget.screentimeData.retention_days || 365) : 365
   property var appsToday: hostWidget ? (hostWidget.screentimeData.apps_today || {}) : {}
@@ -97,7 +98,7 @@ Panel {
 
         Item {
           width: parent.width
-          height: Math.max(titleText.height, modeRow.height, settingsButton.height)
+          height: Math.max(titleText.height, modeRow.height, Math.max(settingsButton.height, modeHelp.height))
 
           Text {
             id: titleText
@@ -112,8 +113,8 @@ Panel {
 
           Row {
             id: modeRow
-            anchors.right: settingsButton.left
-            anchors.rightMargin: Style.space(8)
+            anchors.right: modeHelp.left
+            anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(8)
 
@@ -139,6 +140,18 @@ Panel {
               text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Tracking all screen-on time. Click to track active use only." : "Tracking active use only. Click to track all screen-on time."
               fontFamily: root.contentFontFamily
             }
+          }
+
+          PanelActionButton {
+            id: modeHelp
+            anchors.right: settingsButton.left
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            iconText: "?"
+            tooltipText: "Always counts all screen-on time. Active pauses while idle."
+            foreground: Qt.darker(root.contentForeground, 1.2)
+            fontFamily: root.contentFontFamily
+            fontSize: Style.font.caption
           }
 
           Button {
@@ -175,103 +188,171 @@ Panel {
         Column {
           width: parent.width
           visible: root.settingsExpanded
-          spacing: 8
+          spacing: Style.space(12)
 
-          Row {
-            spacing: 16
-
-            Row {
-              spacing: 8
-
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Weekly"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.2)
-              }
-
-              ToggleSwitch {
-                anchors.verticalCenter: parent.verticalCenter
-                checked: root.showWeekly
-                foreground: root.contentForeground
-                busy: settingsProcess.running
-                onToggled: root.runSettings(["toggle-weekly"])
-              }
-            }
+          Column {
+            width: parent.width
+            spacing: Style.space(4)
 
             Row {
-              spacing: 8
+              spacing: Style.space(16)
 
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Apps"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.2)
+              Row {
+                spacing: Style.space(8)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Weekly"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.2)
+                }
+
+                ToggleSwitch {
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: root.showWeekly
+                  foreground: root.contentForeground
+                  busy: settingsProcess.running
+                  onToggled: root.runSettings(["toggle-weekly"])
+                }
               }
 
-              ToggleSwitch {
-                anchors.verticalCenter: parent.verticalCenter
-                checked: root.showApps
-                foreground: root.contentForeground
-                busy: settingsProcess.running
-                onToggled: root.runSettings(["toggle-apps-show"])
+              Row {
+                spacing: Style.space(8)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Apps"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.2)
+                }
+
+                ToggleSwitch {
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: root.showApps
+                  foreground: root.contentForeground
+                  busy: settingsProcess.running
+                  onToggled: root.runSettings(["toggle-apps-show"])
+                }
+              }
+
+              Row {
+                spacing: Style.space(8)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Icons"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.2)
+                }
+
+                ToggleSwitch {
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: root.showAppIcons
+                  foreground: root.contentForeground
+                  busy: settingsProcess.running
+                  onToggled: root.runSettings(["toggle-app-icons"])
+                }
               }
             }
           }
 
-          Row {
-            spacing: 16
+          Column {
+            width: parent.width
+            spacing: Style.space(4)
 
-            Column {
-              spacing: 4
+            Row {
+              width: parent.width
+              spacing: Style.space(16)
 
-              Text {
-                text: "App identification"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.2)
+              Column {
+                spacing: Style.space(4)
+
+                Row {
+                  spacing: Style.space(4)
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "App identification"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
+
+                  PanelActionButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    iconText: "?"
+                    tooltipText: "Simple groups by window class like zen or foot. Smart resolves the program running inside terminals, e.g. opencode instead of foot."
+                    foreground: Qt.darker(root.contentForeground, 1.2)
+                    fontFamily: root.contentFontFamily
+                    fontSize: Style.font.caption
+                  }
+                }
+
+                ButtonGroup {
+                  options: [
+                    { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
+                    { value: "class", label: "Simple", tooltip: "Track window class only" },
+                    { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
+                  ]
+                  value: root.appMode
+                  foreground: root.contentForeground
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                  focusable: false
+                  onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
+                }
+
+                Text {
+                  width: parent.width
+                  wrapMode: Text.WordWrap
+                  text: "Simple tracks window names. Smart also sees inside terminals."
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.5)
+                }
               }
 
-              ButtonGroup {
-                options: [
-                  { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
-                  { value: "class", label: "Simple", tooltip: "Track window class only" },
-                  { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
-                ]
-                value: root.appMode
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                fontSize: Style.font.caption
-                focusable: false
-                onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
-              }
-            }
+              Column {
+                spacing: Style.space(4)
 
-            Column {
-              spacing: 4
+                Row {
+                  spacing: Style.space(4)
 
-              Text {
-                text: "Keep history (" + root.retentionDays + " days)"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.2)
-              }
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Keep history (" + root.retentionDays + " days)"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
 
-              ButtonGroup {
-                options: [
-                  { value: "30", label: "30d", tooltip: "Keep 30 days" },
-                  { value: "90", label: "90d", tooltip: "Keep 90 days" },
-                  { value: "180", label: "6mo", tooltip: "Keep 6 months" },
-                  { value: "365", label: "12mo", tooltip: "Keep 12 months" }
-                ]
-                value: String(root.retentionDays)
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                fontSize: Style.font.caption
-                focusable: false
-                onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
+                  PanelActionButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    iconText: "?"
+                    tooltipText: "How many days of per-day history are kept. Older days are pruned automatically."
+                    foreground: Qt.darker(root.contentForeground, 1.2)
+                    fontFamily: root.contentFontFamily
+                    fontSize: Style.font.caption
+                  }
+                }
+
+                ButtonGroup {
+                  options: [
+                    { value: "30", label: "30d", tooltip: "Keep 30 days" },
+                    { value: "90", label: "90d", tooltip: "Keep 90 days" },
+                    { value: "180", label: "6mo", tooltip: "Keep 6 months" },
+                    { value: "365", label: "12mo", tooltip: "Keep 12 months" }
+                  ]
+                  value: String(root.retentionDays)
+                  foreground: root.contentForeground
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                  focusable: false
+                  onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
+                }
               }
             }
           }
@@ -301,6 +382,7 @@ Panel {
                 id: appList
                 foreground: root.contentForeground
                 fontFamily: root.contentFontFamily
+                showIcons: root.showAppIcons
               }
             }
           }
@@ -373,6 +455,11 @@ Panel {
               } catch(e) {}
             }
           }
+        }
+
+        Item {
+          width: parent.width
+          height: Style.space(12)
         }
         }
       }

@@ -30,6 +30,146 @@ MONTH_ABBR = [
 
 APP_MODES = ("off", "class", "smart")
 
+_DESKTOP_ENTRY_CACHE = None
+
+
+def _parse_desktop_file(path):
+    """Parse StartupWMClass/Name/Exec/Icon from a .desktop file.
+
+    Manual line parse (no configparser): never raises on malformed
+    files, ignores localized keys (Name[xx]) and non-entry sections.
+    Returns (wmclass, name, exec_base, icon) lowercased except icon.
+    """
+    wmclass = ""
+    name = ""
+    execv = ""
+    icon = ""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            in_entry = True  # headerless files still parse
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("["):
+                    try:
+                        sec = line[1:line.index("]")].strip()
+                    except ValueError:
+                        in_entry = False
+                        continue
+                    in_entry = (sec == "Desktop Entry")
+                    continue
+                if not in_entry:
+                    continue
+                if "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip()
+                if key == "StartupWMClass" and not wmclass:
+                    wmclass = value
+                elif key == "Name" and not name:
+                    name = value
+                elif key == "Exec" and not execv:
+                    execv = value
+                elif key == "Icon" and not icon:
+                    icon = value
+    except Exception:
+        return None
+    try:
+        exec_base = _exec_basename(execv)
+    except Exception:
+        exec_base = ""
+    try:
+        return {
+            "wmclass": wmclass.strip().lower(),
+            "name": name.strip().lower(),
+            "exec": exec_base,
+            "icon": icon.strip(),
+        }
+    except Exception:
+        return None
+
+
+def _exec_basename(exec_value):
+    try:
+        s = (exec_value or "").strip()
+        if not s:
+            return ""
+        if s[0] in ("'", '"'):
+            q = s[0]
+            end = s.find(q, 1)
+            token = s[1:end] if end != -1 else s[1:]
+        else:
+            token = s.split(None, 1)[0]
+        token = token.strip().strip("'\"").strip()
+        if not token:
+            return ""
+        return os.path.basename(token).lower()
+    except Exception:
+        return ""
+
+
+def _load_desktop_entries():
+    """Scan .desktop files once per process; always returns a list."""
+    global _DESKTOP_ENTRY_CACHE
+    if _DESKTOP_ENTRY_CACHE is not None:
+        return _DESKTOP_ENTRY_CACHE
+    entries = []
+    try:
+        dirs = [
+            "/usr/share/applications",
+            os.path.expanduser("~/.local/share/applications"),
+        ]
+        for d in dirs:
+            try:
+                files = os.listdir(d)
+            except Exception:
+                continue
+            for fn in files:
+                if not fn.endswith(".desktop"):
+                    continue
+                try:
+                    parsed = _parse_desktop_file(os.path.join(d, fn))
+                except Exception:
+                    continue
+                if parsed is None:
+                    continue
+                entries.append(parsed)
+    except Exception:
+        pass
+    _DESKTOP_ENTRY_CACHE = entries
+    return entries
+
+
+def resolve_app_icon(app_name):
+    """Return the desktop Icon= name for app_name, or "".
+
+    Matches app_name against lowercased StartupWMClass, then Name,
+    then Exec basename. Total-failure-safe: any exception -> "".
+    """
+    try:
+        if not isinstance(app_name, str):
+            return ""
+        key = app_name.strip().lower()
+        if not key:
+            return ""
+        if "." in key:
+            key = key.split(".")[-1].strip()
+            if not key:
+                return ""
+        entries = _load_desktop_entries()
+        for field in ("wmclass", "name", "exec"):
+            for e in entries:
+                try:
+                    if e.get(field) == key and e.get("icon"):
+                        return e["icon"]
+                except Exception:
+                    continue
+        return ""
+    except Exception:
+        return ""
+
 
 def load_data():
     if os.path.exists(STATE_FILE):
@@ -348,6 +488,7 @@ def get_settings(data):
     return {
         "show_weekly": settings.get("show_weekly", True),
         "show_apps": settings.get("show_apps", True),
+        "show_app_icons": settings.get("show_app_icons", True),
         "app_mode": settings.get("app_mode", "class"),
         "retention_days": settings.get("retention_days", 365),
     }
@@ -371,6 +512,18 @@ def toggle_apps_show():
         if not isinstance(settings, dict):
             settings = {}
         settings["show_apps"] = not settings.get("show_apps", True)
+        data["_settings"] = settings
+
+    update_state(mutate)
+    print_today()
+
+
+def toggle_app_icons():
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["show_app_icons"] = not settings.get("show_app_icons", True)
         data["_settings"] = settings
 
     update_state(mutate)
@@ -447,11 +600,17 @@ def get_apps_today(data, date_str=None):
     apps = day.get("_apps", {})
     if not isinstance(apps, dict):
         return {"total": 0, "apps": []}
-    items = [
-        {"name": k, "seconds": v}
-        for k, v in apps.items()
-        if isinstance(k, str) and isinstance(v, int)
-    ]
+    icon_cache = {}
+    items = []
+    for k, v in apps.items():
+        if not (isinstance(k, str) and isinstance(v, int)):
+            continue
+        if k not in icon_cache:
+            try:
+                icon_cache[k] = resolve_app_icon(k)
+            except Exception:
+                icon_cache[k] = ""
+        items.append({"name": k, "seconds": v, "icon": icon_cache[k]})
     total = sum(x["seconds"] for x in items)
     items.sort(key=lambda x: x["seconds"], reverse=True)
     return {"total": total, "apps": items[:10]}
@@ -480,6 +639,7 @@ def print_today():
         "show_weekly": settings["show_weekly"],
         "app_mode": settings["app_mode"],
         "show_apps": settings["show_apps"],
+        "show_app_icons": settings["show_app_icons"],
         "retention_days": settings["retention_days"],
         "apps_today": apps_today,
     }))
@@ -536,11 +696,17 @@ def apps_week(offset=0):
         apps_dict = day_data.get("_apps", {})
         if not isinstance(apps_dict, dict):
             apps_dict = {}
-        items = [
-            {"name": k, "seconds": v}
-            for k, v in apps_dict.items()
-            if isinstance(k, str) and isinstance(v, int)
-        ]
+        icon_cache = {}
+        items = []
+        for k, v in apps_dict.items():
+            if not (isinstance(k, str) and isinstance(v, int)):
+                continue
+            if k not in icon_cache:
+                try:
+                    icon_cache[k] = resolve_app_icon(k)
+                except Exception:
+                    icon_cache[k] = ""
+            items.append({"name": k, "seconds": v, "icon": icon_cache[k]})
         items.sort(key=lambda x: x["seconds"], reverse=True)
         total = sum(x["seconds"] for x in items)
         week_total += total
@@ -577,6 +743,8 @@ if __name__ == "__main__":
             toggle_weekly()
         elif cmd in ("toggle-apps-show", "toggle_apps_show", "toggle-apps", "toggle_apps"):
             toggle_apps_show()
+        elif cmd in ("toggle-app-icons", "toggle_app_icons", "toggle-icons", "toggle_icons"):
+            toggle_app_icons()
         elif cmd in ("set-app-mode", "set_app_mode", "set-appmode"):
             if len(sys.argv) < 3:
                 print("usage: tracker.py set-app-mode <off|class|smart>", file=sys.stderr)

@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import qs.Commons
 import qs.Ui
 
@@ -18,6 +19,18 @@ Column {
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
   property bool showMore: false
+  property bool showIcons: true
+
+  // Themed-icon lookup copied from the shell kit (NotificationCard /
+  // AppLibrary): Quickshell.iconPath resolves a desktop Icon= name to a
+  // file/image URL; absolute paths and URLs pass through untouched.
+  function iconSource(icon) {
+    var value = String(icon || "")
+    if (value.length === 0) return ""
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+    if (value.charAt(0) === "/") return "file://" + value
+    return Quickshell.iconPath(value, true)
+  }
 
   function formatTime(sec) {
     if (!sec || sec <= 0) return "0m"
@@ -40,12 +53,33 @@ Column {
     return first
   }
 
-  Text {
-    text: (root.title.length > 0 ? root.title + " · " : "") + root.formatTime(root.totalSeconds)
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.body
-    font.bold: true
-    color: Qt.darker(root.foreground, 1.2)
+  Item {
+    width: parent.width
+    height: Math.max(headerText.height, helpButton.height)
+
+    Text {
+      id: headerText
+      anchors.left: parent.left
+      anchors.right: helpButton.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      elide: Text.ElideRight
+      text: (root.title.length > 0 ? root.title + " · " : "") + root.formatTime(root.totalSeconds)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      font.bold: true
+      color: Qt.darker(root.foreground, 1.2)
+    }
+
+    PanelActionButton {
+      id: helpButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      iconText: "?"
+      tooltipText: "Top apps by focused time. Click a day in the weekly chart to inspect it."
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+    }
   }
 
   Repeater {
@@ -58,12 +92,33 @@ Column {
 
       property int seconds: modelData.seconds || 0
       property int pct: Math.round(100 * seconds / Math.max(1, root.totalSeconds))
+      property string appIcon: (modelData.icon || "")
+      property bool hasIcon: root.showIcons && appIcon !== ""
+
+      Image {
+        id: appIconImage
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        width: Style.space(14)
+        height: Style.space(14)
+        fillMode: Image.PreserveAspectFit
+        // Decode at physical pixels — a logical-size decode leaves
+        // PNG icons upscaled and blurry on HiDPI displays (kit pattern).
+        sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+        sourceSize.height: Math.round(height * Screen.devicePixelRatio)
+        source: hasIcon ? root.iconSource(appIcon) : ""
+        asynchronous: true
+        // Hide the slot when the themed name is missing from the user's
+        // icon theme — avoids Qt's broken-image placeholder.
+        visible: hasIcon && status !== Image.Error
+      }
 
       Text {
         id: nameLabel
         anchors.left: parent.left
+        anchors.leftMargin: appIconImage.visible ? appIconImage.width + Style.space(6) : 0
         anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(90)
+        width: Style.space(90) - (appIconImage.visible ? appIconImage.width + Style.space(6) : 0)
         elide: Text.ElideRight
         text: modelData.name || ""
         font.family: root.fontFamily
