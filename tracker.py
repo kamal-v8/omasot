@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import fcntl
 import json
 import os
 import datetime
@@ -6,6 +7,7 @@ import subprocess
 import sys
 
 STATE_FILE = os.path.expanduser("~/.local/state/screentime.json")
+LOCK_FILE = STATE_FILE + ".lock"
 
 SAMPLE_SECONDS = 5
 
@@ -96,6 +98,25 @@ def save_data(data):
     with open(tmp_file, "w") as f:
         json.dump(data, f)
     os.replace(tmp_file, STATE_FILE)
+
+
+def update_state(fn):
+    """Load, mutate via fn(data), and save under an exclusive lock.
+
+    The 60s day recorder and the 5s app recorder run as separate
+    processes; without this lock their read-modify-write cycles
+    interleave and the slower writer silently discards the faster
+    one's increments (last-writer-wins on a stale read).
+    """
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    with open(LOCK_FILE, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            data = load_data()
+            fn(data)
+            save_data(data)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def _normalize_app_name(value):
@@ -239,41 +260,37 @@ def resolve_app(mode):
 
 
 def record(state="active"):
-    data = load_data()
-    mode = data.get("_mode", "active")
+    if state == "idle":
+        mode = load_data().get("_mode", "active")
+        if mode == "active":
+            print_today()
+            return
 
-    if state == "idle" and mode == "active":
-        print_today()
-        return
+    def mutate(data):
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        hour_str = now.strftime("%H")
 
-    now = datetime.datetime.now()
-    date_str = now.strftime("%Y-%m-%d")
-    hour_str = now.strftime("%H")
+        day = data.get(date_str)
+        if not isinstance(day, dict):
+            day = {}
+            data[date_str] = day
 
-    if date_str not in data:
-        data[date_str] = {}
-    if not isinstance(data[date_str], dict):
-        data[date_str] = {}
+        cur = day.get(hour_str, 0)
+        if not isinstance(cur, int):
+            try:
+                cur = int(cur)
+            except (ValueError, TypeError):
+                cur = 0
 
-    if hour_str not in data[date_str]:
-        data[date_str][hour_str] = 0
+        day[hour_str] = cur + 1
 
-    cur = data[date_str][hour_str]
-    if not isinstance(cur, int):
-        try:
-            cur = int(cur)
-        except (ValueError, TypeError):
-            cur = 0
-        data[date_str][hour_str] = cur
-
-    data[date_str][hour_str] += 1
-    save_data(data)
+    update_state(mutate)
     print_today()
 
 
 def record_app(state="active"):
-    data = load_data()
-    settings = get_settings(data)
+    settings = get_settings(load_data())
     app_mode = settings.get("app_mode", "class")
 
     if app_mode == "off" or state == "idle":
@@ -289,36 +306,38 @@ def record_app(state="active"):
         print_today()
         return
 
-    now = datetime.datetime.now()
-    date_str = now.strftime("%Y-%m-%d")
+    def mutate(data):
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
 
-    day = data.get(date_str)
-    if not isinstance(day, dict):
-        day = {}
-        data[date_str] = day
+        day = data.get(date_str)
+        if not isinstance(day, dict):
+            day = {}
+            data[date_str] = day
 
-    apps = day.get("_apps")
-    if not isinstance(apps, dict):
-        apps = {}
-        day["_apps"] = apps
+        apps = day.get("_apps")
+        if not isinstance(apps, dict):
+            apps = {}
+            day["_apps"] = apps
 
-    cur = apps.get(name, 0)
-    if not isinstance(cur, int):
-        try:
-            cur = int(cur)
-        except (ValueError, TypeError):
-            cur = 0
-    apps[name] = cur + SAMPLE_SECONDS
+        cur = apps.get(name, 0)
+        if not isinstance(cur, int):
+            try:
+                cur = int(cur)
+            except (ValueError, TypeError):
+                cur = 0
+        apps[name] = cur + SAMPLE_SECONDS
 
-    save_data(data)
+    update_state(mutate)
     print_today()
 
 
 def toggle_mode():
-    data = load_data()
-    mode = data.get("_mode", "active")
-    data["_mode"] = "always" if mode == "active" else "active"
-    save_data(data)
+    def mutate(data):
+        mode = data.get("_mode", "active")
+        data["_mode"] = "always" if mode == "active" else "active"
+
+    update_state(mutate)
     print_today()
 
 
@@ -335,24 +354,26 @@ def get_settings(data):
 
 
 def toggle_weekly():
-    data = load_data()
-    settings = data.get("_settings", {})
-    if not isinstance(settings, dict):
-        settings = {}
-    settings["show_weekly"] = not settings.get("show_weekly", True)
-    data["_settings"] = settings
-    save_data(data)
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["show_weekly"] = not settings.get("show_weekly", True)
+        data["_settings"] = settings
+
+    update_state(mutate)
     print_today()
 
 
 def toggle_apps_show():
-    data = load_data()
-    settings = data.get("_settings", {})
-    if not isinstance(settings, dict):
-        settings = {}
-    settings["show_apps"] = not settings.get("show_apps", True)
-    data["_settings"] = settings
-    save_data(data)
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["show_apps"] = not settings.get("show_apps", True)
+        data["_settings"] = settings
+
+    update_state(mutate)
     print_today()
 
 
@@ -363,13 +384,14 @@ def set_app_mode(mode):
             file=sys.stderr,
         )
         sys.exit(1)
-    data = load_data()
-    settings = data.get("_settings", {})
-    if not isinstance(settings, dict):
-        settings = {}
-    settings["app_mode"] = mode
-    data["_settings"] = settings
-    save_data(data)
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["app_mode"] = mode
+        data["_settings"] = settings
+
+    update_state(mutate)
     print_today()
 
 
@@ -386,13 +408,15 @@ def set_retention_days(value):
         days = 1
     if days > 365:
         days = 365
-    data = load_data()
-    settings = data.get("_settings", {})
-    if not isinstance(settings, dict):
-        settings = {}
-    settings["retention_days"] = days
-    data["_settings"] = settings
-    save_data(data)
+
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["retention_days"] = days
+        data["_settings"] = settings
+
+    update_state(mutate)
     print_today()
 
 
