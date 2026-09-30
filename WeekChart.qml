@@ -73,11 +73,11 @@ Column {
   onWeekOffsetChanged: root.refresh()
   Component.onCompleted: root.refresh()
 
-  // ── Header: week navigation + title + summary ───────────────────
+  // ── Header: week navigation + title ───────────────────────────
   Item {
     id: header
     width: parent.width
-    height: Math.max(prevButton.height, nextButton.height, titleText.height, summaryText.height)
+    height: Math.max(prevButton.height, nextButton.height, titleText.height)
 
     PanelActionButton {
       id: prevButton
@@ -108,8 +108,7 @@ Column {
       id: titleText
       anchors.left: nextButton.right
       anchors.leftMargin: Style.space(8)
-      anchors.right: summaryText.left
-      anchors.rightMargin: Style.space(8)
+      anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: root.weekLabel
       textFormat: Text.PlainText
@@ -119,17 +118,18 @@ Column {
       font.bold: true
       color: Qt.darker(root.foreground, 1.2)
     }
+  }
 
-    Text {
-      id: summaryText
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      text: root.formatTime(root.weekTotal) + " · " + root.weekShare + "%"
-      textFormat: Text.PlainText
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      color: Qt.darker(root.foreground, 1.5)
-    }
+  Text {
+    id: summaryText
+    width: parent.width
+    horizontalAlignment: Text.AlignRight
+    elide: Text.ElideRight
+    text: root.formatTime(root.weekTotal) + " · " + root.weekShare + "%"
+    textFormat: Text.PlainText
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    color: Qt.darker(root.foreground, 1.5)
   }
 
   // ── Bars: one bottom-anchored column per day ────────────────────
