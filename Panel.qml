@@ -25,6 +25,8 @@ Panel {
   property int retentionDays: hostWidget ? (hostWidget.screentimeData.retention_days || 365) : 365
   property var appsToday: hostWidget ? (hostWidget.screentimeData.apps_today || {}) : {}
 
+  property string currentView: "daily"
+
   function runSettings(args) {
     var cmd = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", "")]
     settingsProcess.command = cmd.concat(args)
@@ -73,7 +75,7 @@ Panel {
     bar: root.bar
     open: root.opened
     centerOnBar: true
-    contentWidth: panel.fittedContentWidth(Style.space(950))
+    contentWidth: panel.fittedContentWidth(Style.space(440))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
@@ -190,12 +192,31 @@ Panel {
           visible: root.settingsExpanded
           spacing: Style.space(12)
 
-          Column {
+          BorderSurface {
             width: parent.width
-            spacing: Style.space(4)
+            implicitHeight: sectionsBox.implicitHeight + 24
+            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
+            radius: Style.cornerRadius
+            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
 
-            Row {
-              spacing: Style.space(16)
+            Column {
+              id: sectionsBox
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.margins: 12
+              spacing: Style.space(8)
+
+              Text {
+                text: "Sections"
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: Qt.darker(root.contentForeground, 1.2)
+              }
+
+              Row {
+                spacing: Style.space(16)
 
               Row {
                 spacing: Style.space(8)
@@ -256,189 +277,198 @@ Panel {
                   onToggled: root.runSettings(["toggle-app-icons"])
                 }
               }
+              }
             }
           }
 
-          Column {
+          BorderSurface {
             width: parent.width
-            spacing: Style.space(4)
+            implicitHeight: identBox.implicitHeight + 24
+            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
+            radius: Style.cornerRadius
+            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
 
-            Row {
-              width: parent.width
-              spacing: Style.space(16)
+            Column {
+              id: identBox
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.margins: 12
+              spacing: Style.space(8)
 
-              Column {
+              Text {
+                text: "App identification"
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: Qt.darker(root.contentForeground, 1.2)
+              }
+
+              Row {
                 spacing: Style.space(4)
 
-                Row {
-                  spacing: Style.space(4)
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "App identification"
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    color: Qt.darker(root.contentForeground, 1.2)
-                  }
-
-                  PanelActionButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconText: "?"
-                    tooltipText: "Simple groups by window class like zen or foot. Smart resolves the program running inside terminals, e.g. opencode instead of foot."
-                    foreground: Qt.darker(root.contentForeground, 1.2)
-                    fontFamily: root.contentFontFamily
-                    fontSize: Style.font.caption
-                  }
-                }
-
-                ButtonGroup {
-                  options: [
-                    { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
-                    { value: "class", label: "Simple", tooltip: "Track window class only" },
-                    { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
-                  ]
-                  value: root.appMode
-                  foreground: root.contentForeground
-                  fontFamily: root.contentFontFamily
-                  fontSize: Style.font.caption
-                  focusable: false
-                  onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
-                }
-
                 Text {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: "Simple tracks window names. Smart also sees inside terminals."
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "App identification"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
-                  color: Qt.darker(root.contentForeground, 1.5)
+                  color: Qt.darker(root.contentForeground, 1.2)
+                }
+
+                PanelActionButton {
+                  anchors.verticalCenter: parent.verticalCenter
+                  iconText: "?"
+                  tooltipText: "Simple groups by window class like zen or foot. Smart resolves the program running inside terminals, e.g. opencode instead of foot."
+                  foreground: Qt.darker(root.contentForeground, 1.2)
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
                 }
               }
 
-              Column {
+              ButtonGroup {
+                options: [
+                  { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
+                  { value: "class", label: "Simple", tooltip: "Track window class only" },
+                  { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
+                ]
+                value: root.appMode
+                foreground: root.contentForeground
+                fontFamily: root.contentFontFamily
+                fontSize: Style.font.caption
+                focusable: false
+                onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
+              }
+
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "Simple tracks window names. Smart also sees inside terminals."
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                color: Qt.darker(root.contentForeground, 1.5)
+              }
+            }
+          }
+
+          BorderSurface {
+            width: parent.width
+            implicitHeight: historyBox.implicitHeight + 24
+            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
+            radius: Style.cornerRadius
+            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
+
+            Column {
+              id: historyBox
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.margins: 12
+              spacing: Style.space(8)
+
+              Text {
+                text: "Keep history"
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: Qt.darker(root.contentForeground, 1.2)
+              }
+
+              Row {
                 spacing: Style.space(4)
 
-                Row {
-                  spacing: Style.space(4)
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Keep history (" + root.retentionDays + " days)"
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    color: Qt.darker(root.contentForeground, 1.2)
-                  }
-
-                  PanelActionButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconText: "?"
-                    tooltipText: "How many days of per-day history are kept. Older days are pruned automatically."
-                    foreground: Qt.darker(root.contentForeground, 1.2)
-                    fontFamily: root.contentFontFamily
-                    fontSize: Style.font.caption
-                  }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Keep history (" + root.retentionDays + " days)"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.2)
                 }
 
-                ButtonGroup {
-                  options: [
-                    { value: "30", label: "30d", tooltip: "Keep 30 days" },
-                    { value: "90", label: "90d", tooltip: "Keep 90 days" },
-                    { value: "180", label: "6mo", tooltip: "Keep 6 months" },
-                    { value: "365", label: "12mo", tooltip: "Keep 12 months" }
-                  ]
-                  value: String(root.retentionDays)
-                  foreground: root.contentForeground
+                PanelActionButton {
+                  anchors.verticalCenter: parent.verticalCenter
+                  iconText: "?"
+                  tooltipText: "How many days of per-day history are kept. Older days are pruned automatically."
+                  foreground: Qt.darker(root.contentForeground, 1.2)
                   fontFamily: root.contentFontFamily
                   fontSize: Style.font.caption
-                  focusable: false
-                  onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
                 }
+              }
+
+              ButtonGroup {
+                options: [
+                  { value: "30", label: "30d", tooltip: "Keep 30 days" },
+                  { value: "90", label: "90d", tooltip: "Keep 90 days" },
+                  { value: "180", label: "6mo", tooltip: "Keep 6 months" },
+                  { value: "365", label: "12mo", tooltip: "Keep 12 months" }
+                ]
+                value: String(root.retentionDays)
+                foreground: root.contentForeground
+                fontFamily: root.contentFontFamily
+                fontSize: Style.font.caption
+                focusable: false
+                onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
               }
             }
           }
         }
 
-        Row {
+        ButtonGroup {
+          id: viewSwitch
+          visible: root.showWeekly || (root.showApps && root.appMode !== "off")
+          options: {
+            var opts = [{ value: "daily", label: "Daily", tooltip: "Today's screen time" }]
+            if (root.showWeekly)
+              opts.push({ value: "weekly", label: "Weekly", tooltip: "7-day breakdown" })
+            if (root.showApps && root.appMode !== "off")
+              opts.push({ value: "apps", label: "Apps", tooltip: "Per-app usage" })
+            return opts
+          }
+          value: root.currentView
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+          fontSize: Style.font.caption
+          focusable: false
+          onChanged: function(v) { root.currentView = v }
+        }
+
+        DailyCard {
+          visible: root.currentView === "daily"
+          totalText: hostWidget ? hostWidget.displayText : "0m"
+          todayData: root.todayData
+          maxMinutes: root.maxMinutes
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+        }
+
+        WeekChart {
+          id: weekChart
+          visible: root.showWeekly && root.currentView === "weekly"
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+          onDaySelected: function(dateStr, dayData) {
+            appList.title = (dayData.label || "") + " " + (dateStr || "")
+            appList.totalSeconds = dayData.total || 0
+            appList.apps = dayData.apps || []
+          }
+        }
+
+        Flickable {
+          id: appsScroll
           width: parent.width
-          spacing: Style.space(12)
+          height: Style.space(220)
+          visible: root.currentView === "apps" && root.showApps && root.appMode !== "off"
+          contentWidth: width
+          contentHeight: appList.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
 
-          BorderSurface {
-            width: (parent.width - 2 * Style.space(12)) / 3
-            implicitHeight: appsCardCol.implicitHeight + 24
-            visible: root.showApps && root.appMode !== "off"
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
-
-            Column {
-              id: appsCardCol
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: 8
-
-              AppList {
-                id: appList
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                showIcons: root.showAppIcons
-              }
-            }
-          }
-
-          BorderSurface {
-            width: (parent.width - 2 * Style.space(12)) / 3
-            implicitHeight: dailyCardCol.implicitHeight + 24
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
-
-            Column {
-              id: dailyCardCol
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: 8
-
-              DailyCard {
-                totalText: hostWidget ? hostWidget.displayText : "0m"
-                todayData: root.todayData
-                maxMinutes: root.maxMinutes
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-              }
-            }
-          }
-
-          BorderSurface {
-            width: (parent.width - 2 * Style.space(12)) / 3
-            implicitHeight: weeklyCardCol.implicitHeight + 24
-            visible: root.showWeekly
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
-
-            Column {
-              id: weeklyCardCol
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: 8
-
-              WeekChart {
-                id: weekChart
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                onDaySelected: function(dateStr, dayData) {
-                  appList.title = (dayData.label || "") + " " + (dateStr || "")
-                  appList.totalSeconds = dayData.total || 0
-                  appList.apps = dayData.apps || []
-                }
-              }
-            }
+          AppList {
+            id: appList
+            width: appsScroll.width
+            foreground: root.contentForeground
+            fontFamily: root.contentFontFamily
+            showIcons: root.showAppIcons
           }
         }
 
@@ -452,6 +482,9 @@ Panel {
                 if (!line) return
                 var data = JSON.parse(line)
                 if (hostWidget) hostWidget.screentimeData = data
+                var m = data.app_mode || "class"
+                if (root.currentView === "apps" && (data.show_apps === false || m === "off")) root.currentView = "daily"
+                if (root.currentView === "weekly" && data.show_weekly === false) root.currentView = "daily"
               } catch(e) {}
             }
           }

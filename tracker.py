@@ -44,6 +44,7 @@ def _parse_desktop_file(path):
     name = ""
     execv = ""
     icon = ""
+    nodisplay = False
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             in_entry = True  # headerless files still parse
@@ -74,6 +75,8 @@ def _parse_desktop_file(path):
                     execv = value
                 elif key == "Icon" and not icon:
                     icon = value
+                elif key == "NoDisplay" and value.strip().lower() == "true":
+                    nodisplay = True
     except Exception:
         return None
     try:
@@ -86,6 +89,7 @@ def _parse_desktop_file(path):
             "name": name.strip().lower(),
             "exec": exec_base,
             "icon": icon.strip(),
+            "nodisplay": nodisplay,
         }
     except Exception:
         return None
@@ -134,6 +138,10 @@ def _load_desktop_entries():
                 except Exception:
                     continue
                 if parsed is None:
+                    continue
+                # Background services (agents, auth daemons, helpers)
+                # reuse generic names — never borrow their icons.
+                if parsed.get("nodisplay"):
                     continue
                 entries.append(parsed)
     except Exception:
