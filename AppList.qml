@@ -63,7 +63,7 @@ Column {
         id: nameLabel
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(110)
+        width: Style.space(90)
         elide: Text.ElideRight
         text: modelData.name || ""
         font.family: root.fontFamily
@@ -75,7 +75,7 @@ Column {
         id: valueLabel
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(80)
+        width: Style.space(76)
         horizontalAlignment: Text.AlignRight
         elide: Text.ElideRight
         text: root.formatTime(seconds) + " · " + pct + "%"
