@@ -161,7 +161,7 @@ Column {
   Item {
     id: bars
     width: parent.width
-    height: Style.space(80)
+    height: Style.space(64)
 
     Row {
       anchors.fill: parent

@@ -88,7 +88,7 @@ Panel {
       Flickable {
         id: contentScroll
         anchors.fill: parent
-        anchors.margins: Style.space(24)
+        anchors.margins: Style.space(16)
         contentWidth: width
         contentHeight: content.implicitHeight
         clip: true
@@ -98,7 +98,7 @@ Panel {
         Column {
           id: content
           width: contentScroll.width
-          spacing: Style.space(16)
+          spacing: Style.space(12)
 
         Item {
           width: parent.width

@@ -19,14 +19,14 @@ Column {
   Text {
     text: root.totalText
     font.family: root.fontFamily
-    font.pixelSize: 52
+    font.pixelSize: 44
     font.bold: true
     color: root.foreground
   }
 
   Item {
     width: parent.width
-    height: Style.space(80)
+    height: Style.space(64)
 
     Row {
       anchors.fill: parent
