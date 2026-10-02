@@ -151,7 +151,7 @@ Column {
       id: helpButton
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Weekly focused-app totals, Monday to Sunday. Click a bar to inspect that day."
+      tooltipText: "Weekly focused-app totals, Monday to Sunday. Idle time is not attributed to any day. Click a bar to inspect that day."
       foreground: root.foreground
       fontFamily: root.fontFamily
     }

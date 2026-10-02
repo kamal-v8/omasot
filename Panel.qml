@@ -40,6 +40,8 @@ Panel {
       weekChart.selectedDate = weekChart.todayStr
       appList.title = "Today"
       appList.totalSeconds = t.total || 0
+      appList.dayTotalSeconds = t.day_total || 0
+      appList.unattributedSeconds = t.unattributed || 0
       appList.apps = t.apps || []
     }
   }
@@ -150,7 +152,7 @@ Panel {
             anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             iconText: "?"
-            tooltipText: "Always counts all screen-on time. Active pauses while idle."
+            tooltipText: "Always counts all screen-on time. Active pauses while idle. Per-app stats only count focused use."
             foreground: Qt.darker(root.contentForeground, 1.2)
             fontFamily: root.contentFontFamily
             fontSize: Style.font.caption
@@ -445,31 +447,21 @@ Panel {
           visible: root.showWeekly && root.currentView === "weekly"
           foreground: root.contentForeground
           fontFamily: root.contentFontFamily
-          onDaySelected: function(dateStr, dayData) {
-            appList.title = (dayData.label || "") + " " + (dateStr || "")
-            appList.totalSeconds = dayData.total || 0
-            appList.apps = dayData.apps || []
-          }
+            onDaySelected: function(dateStr, dayData) {
+              appList.title = (dayData.label || "") + " " + (dateStr || "")
+              appList.totalSeconds = dayData.total || 0
+              appList.dayTotalSeconds = dayData.day_total || 0
+              appList.unattributedSeconds = dayData.unattributed || 0
+              appList.apps = dayData.apps || []
+            }
         }
 
-        Flickable {
-          id: appsScroll
-          width: parent.width
-          height: Style.space(220)
+        AppList {
+          id: appList
           visible: root.currentView === "apps" && root.showApps && root.appMode !== "off"
-          contentWidth: width
-          contentHeight: appList.implicitHeight
-          clip: true
-          boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
-
-          AppList {
-            id: appList
-            width: appsScroll.width
-            foreground: root.contentForeground
-            fontFamily: root.contentFontFamily
-            showIcons: root.showAppIcons
-          }
+          foreground: root.contentForeground
+          fontFamily: root.contentFontFamily
+          showIcons: root.showAppIcons
         }
 
         Process {

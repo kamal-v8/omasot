@@ -15,6 +15,8 @@ Column {
 
   property string title: ""
   property int totalSeconds: 0
+  property int dayTotalSeconds: 0
+  property int unattributedSeconds: 0
   property var apps: []
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
@@ -40,6 +42,10 @@ Column {
     return (h > 0 ? h + "h " : "") + (m % 60) + "m"
   }
 
+  // Share basis: the full screen-on day when known (so app rows and
+  // the Idle row share one scale and reconcile), else the focused total.
+  readonly property int shareBase: Math.max(1, root.dayTotalSeconds > 0 ? root.dayTotalSeconds : root.totalSeconds)
+
   // Collapsed view shows the first 6 apps plus an aggregated "Other" row
   // summing the rest. `apps` is expected pre-sorted descending by seconds.
   function visibleApps() {
@@ -64,7 +70,7 @@ Column {
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       elide: Text.ElideRight
-      text: (root.title.length > 0 ? root.title + " · " : "") + root.formatTime(root.totalSeconds)
+      text: (root.title.length > 0 ? root.title + " · " : "") + root.formatTime(root.totalSeconds) + (root.dayTotalSeconds > root.totalSeconds ? " of " + root.formatTime(root.dayTotalSeconds) : "")
       font.family: root.fontFamily
       font.pixelSize: Style.font.body
       font.bold: true
@@ -76,12 +82,78 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Top apps by focused time. Click a day in the weekly chart to inspect it."
+      tooltipText: "Top apps by focused time. Idle time is listed first. Click a day in the weekly chart to inspect it."
       foreground: root.foreground
       fontFamily: root.fontFamily
     }
   }
 
+  Item {
+    width: parent.width
+    height: Style.space(20)
+    visible: root.unattributedSeconds > 0
+
+    Text {
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: Style.space(90)
+      elide: Text.ElideRight
+      text: "Idle / other"
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      color: Qt.darker(root.foreground, 1.5)
+    }
+
+    Text {
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      width: Style.space(76)
+      horizontalAlignment: Text.AlignRight
+      elide: Text.ElideRight
+      text: root.formatTime(root.unattributedSeconds) + " · " + Math.round(100 * root.unattributedSeconds / root.shareBase) + "%"
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      color: Qt.darker(root.foreground, 1.2)
+    }
+
+    Item {
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(90) + Style.space(8)
+      anchors.right: parent.right
+      anchors.rightMargin: Style.space(76) + Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      height: Style.space(12)
+
+      Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+        radius: height / 2
+      }
+
+      Rectangle {
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+          width: Math.min(parent.width, Math.max(0, (root.unattributedSeconds / root.shareBase) * parent.width))
+          height: parent.height
+          color: Qt.darker(root.foreground, 1.5)
+        radius: height / 2
+        visible: root.unattributedSeconds > 0
+      }
+    }
+
+    PanelToolTip {
+      visible: idleMouse.containsMouse
+      text: "Screen-on time with no focused app — idle, lock screen, or empty desktop."
+      fontFamily: root.fontFamily
+    }
+
+    MouseArea {
+      id: idleMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+    }
+  }
   Repeater {
     model: root.visibleApps()
 
@@ -91,7 +163,7 @@ Column {
       height: Style.space(20)
 
       property int seconds: modelData.seconds || 0
-      property int pct: Math.round(100 * seconds / Math.max(1, root.totalSeconds))
+      property int pct: Math.round(100 * seconds / root.shareBase)
       property string appIcon: (modelData.icon || "")
       property bool hasIcon: root.showIcons && appIcon !== ""
 
@@ -156,7 +228,7 @@ Column {
         Rectangle {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          width: Math.min(parent.width, Math.max(0, (seconds / Math.max(1, root.totalSeconds)) * parent.width))
+          width: Math.min(parent.width, Math.max(0, (seconds / root.shareBase) * parent.width))
           height: parent.height
           color: root.foreground
           radius: height / 2
@@ -179,8 +251,9 @@ Column {
     }
   }
 
+
   Text {
-    visible: (root.apps || []).length === 0
+    visible: (root.apps || []).length === 0 && root.unattributedSeconds <= 0
     text: "No app data for this period yet."
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption

@@ -30,6 +30,89 @@ MONTH_ABBR = [
 
 APP_MODES = ("off", "class", "smart")
 
+# Suffixes stripped when normalizing stored app names for display.
+APP_NAME_SUFFIXES = (
+    "-origin", "-default", "-launcher", "-bin", ".bin",
+    "-stable", "-beta", "-dev", "-helper",
+)
+
+# Tokens that carry no app identity on their own; names collapsing to
+# one of these are dropped and their seconds fold into unattributed.
+APP_NAME_FRAGMENTS = {
+    "com", "org", "net", "io", "app", "bin", "default", "unknown",
+    "null", "none", "undefined", "(null)",
+}
+
+
+def clean_app_name(name):
+    """Normalize a stored app key for display, or None if it is junk.
+
+    Merge-only: stored keys are never rewritten, so history needs no
+    migration and nothing is lost — dropped seconds surface as
+    unattributed time instead.
+    """
+    try:
+        if not isinstance(name, str):
+            return None
+        t = name.strip().lower()
+        for _ in range(2):
+            for suf in APP_NAME_SUFFIXES:
+                if t.endswith(suf) and len(t) > len(suf) + 1:
+                    t = t[: -len(suf)]
+                    break
+        t = t.strip("-_. ")
+        if not t or t in APP_NAME_FRAGMENTS:
+            return None
+        if not any(c.isalnum() for c in t):
+            return None
+        return t
+    except Exception:
+        return None
+
+
+def collect_app_items(apps_dict, limit, icon_cache=None):
+    """Merge raw {name: seconds} into sorted display items.
+
+    Returns (items, merged_total). Junk names (clean_app_name -> None)
+    are skipped here; their seconds are accounted as unattributed by
+    the caller via day totals.
+    """
+    if icon_cache is None:
+        icon_cache = {}
+    merged = {}
+    try:
+        entries = apps_dict.items()
+    except Exception:
+        entries = []
+    for k, v in entries:
+        if not (isinstance(k, str) and isinstance(v, int)):
+            continue
+        ck = clean_app_name(k)
+        if ck is None:
+            continue
+        merged[ck] = merged.get(ck, 0) + v
+    items = []
+    for name, seconds in merged.items():
+        if name not in icon_cache:
+            try:
+                icon_cache[name] = resolve_app_icon(name)
+            except Exception:
+                icon_cache[name] = ""
+        items.append({"name": name, "seconds": seconds, "icon": icon_cache[name]})
+    items.sort(key=lambda x: x["seconds"], reverse=True)
+    total = sum(x["seconds"] for x in items)
+    return items[:limit], total
+
+
+def day_seconds(day):
+    """Screen-on seconds for a day dict (hourly minutes × 60)."""
+    try:
+        if not isinstance(day, dict):
+            return 0
+        return sum(v for v in day.values() if isinstance(v, int)) * 60
+    except Exception:
+        return 0
+
 _DESKTOP_ENTRY_CACHE = None
 
 
@@ -604,24 +687,18 @@ def get_apps_today(data, date_str=None):
         date_str = datetime.datetime.now().strftime("%Y-%m-%d")
     day = data.get(date_str, {})
     if not isinstance(day, dict):
-        return {"total": 0, "apps": []}
+        return {"total": 0, "day_total": 0, "unattributed": 0, "apps": []}
     apps = day.get("_apps", {})
     if not isinstance(apps, dict):
-        return {"total": 0, "apps": []}
-    icon_cache = {}
-    items = []
-    for k, v in apps.items():
-        if not (isinstance(k, str) and isinstance(v, int)):
-            continue
-        if k not in icon_cache:
-            try:
-                icon_cache[k] = resolve_app_icon(k)
-            except Exception:
-                icon_cache[k] = ""
-        items.append({"name": k, "seconds": v, "icon": icon_cache[k]})
-    total = sum(x["seconds"] for x in items)
-    items.sort(key=lambda x: x["seconds"], reverse=True)
-    return {"total": total, "apps": items[:10]}
+        apps = {}
+    items, total = collect_app_items(apps, 10, {})
+    day_total = day_seconds(day)
+    return {
+        "total": total,
+        "day_total": day_total,
+        "unattributed": max(0, day_total - total),
+        "apps": items,
+    }
 
 
 def print_today():
@@ -694,6 +771,7 @@ def apps_week(offset=0):
 
     days = []
     week_total = 0
+    icon_cache = {}
     for i in range(7):
         d = monday + datetime.timedelta(days=i)
         date_str = d.isoformat()
@@ -704,25 +782,16 @@ def apps_week(offset=0):
         apps_dict = day_data.get("_apps", {})
         if not isinstance(apps_dict, dict):
             apps_dict = {}
-        icon_cache = {}
-        items = []
-        for k, v in apps_dict.items():
-            if not (isinstance(k, str) and isinstance(v, int)):
-                continue
-            if k not in icon_cache:
-                try:
-                    icon_cache[k] = resolve_app_icon(k)
-                except Exception:
-                    icon_cache[k] = ""
-            items.append({"name": k, "seconds": v, "icon": icon_cache[k]})
-        items.sort(key=lambda x: x["seconds"], reverse=True)
-        total = sum(x["seconds"] for x in items)
+        items, total = collect_app_items(apps_dict, 8, icon_cache)
+        day_total = day_seconds(day_data)
         week_total += total
         days.append({
             "date": date_str,
             "label": label,
             "total": total,
-            "apps": items[:8],
+            "day_total": day_total,
+            "unattributed": max(0, day_total - total),
+            "apps": items,
         })
 
     week_share = round(100 * week_total / (7 * 24 * 3600), 1)
