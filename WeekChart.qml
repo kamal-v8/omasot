@@ -121,7 +121,7 @@ Column {
       anchors.leftMargin: Style.space(8)
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      text: root.weekLabel
+      text: root.weekLabel.toUpperCase()
       textFormat: Text.PlainText
       elide: Text.ElideRight
       font.family: root.fontFamily
@@ -227,13 +227,13 @@ Column {
         property bool isToday: (modelData.date || "") === root.todayStr && (modelData.date || "") !== ""
         property int total: modelData.total || 0
 
-        Column {
-          anchors.centerIn: parent
-          spacing: 0
+                Column {
+                  anchors.centerIn: parent
+                  spacing: 0
 
-          Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: modelData.label || ""
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (modelData.label || "").toUpperCase()
             textFormat: Text.PlainText
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

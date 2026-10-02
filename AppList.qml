@@ -98,7 +98,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       width: Style.space(90)
       elide: Text.ElideRight
-      text: "Idle / other"
+      text: "IDLE / OTHER"
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       color: Qt.darker(root.foreground, 1.5)

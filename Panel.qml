@@ -210,7 +210,7 @@ Panel {
               spacing: Style.space(8)
 
               Text {
-                text: "Sections"
+                text: "SECTIONS"
                 font.family: root.contentFontFamily
                 font.pixelSize: Style.font.caption
                 font.bold: true
@@ -225,7 +225,7 @@ Panel {
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Weekly"
+                  text: "WEEKLY"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
                   color: Qt.darker(root.contentForeground, 1.2)
@@ -245,7 +245,7 @@ Panel {
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Apps"
+                  text: "APPS"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
                   color: Qt.darker(root.contentForeground, 1.2)
@@ -265,7 +265,7 @@ Panel {
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Icons"
+                  text: "ICONS"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
                   color: Qt.darker(root.contentForeground, 1.2)
@@ -298,22 +298,15 @@ Panel {
               anchors.margins: 12
               spacing: Style.space(8)
 
-              Text {
-                text: "App identification"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                color: Qt.darker(root.contentForeground, 1.2)
-              }
-
               Row {
                 spacing: Style.space(4)
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "App identification"
+                  text: "APP IDENTIFICATION"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
+                  font.bold: true
                   color: Qt.darker(root.contentForeground, 1.2)
                 }
 
@@ -367,22 +360,15 @@ Panel {
               anchors.margins: 12
               spacing: Style.space(8)
 
-              Text {
-                text: "Keep history"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                color: Qt.darker(root.contentForeground, 1.2)
-              }
-
               Row {
                 spacing: Style.space(4)
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Keep history (" + root.retentionDays + " days)"
+                  text: "KEEP HISTORY (" + root.retentionDays + " DAYS)"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
+                  font.bold: true
                   color: Qt.darker(root.contentForeground, 1.2)
                 }
 
@@ -418,17 +404,17 @@ Panel {
           id: viewSwitch
           visible: root.showWeekly || (root.showApps && root.appMode !== "off")
           options: {
-            var opts = [{ value: "daily", label: "Daily", tooltip: "Today's screen time" }]
+            var opts = [{ value: "daily", label: "DAILY", tooltip: "Today's screen time" }]
             if (root.showWeekly)
-              opts.push({ value: "weekly", label: "Weekly", tooltip: "7-day breakdown" })
+              opts.push({ value: "weekly", label: "WEEKLY", tooltip: "7-day breakdown" })
             if (root.showApps && root.appMode !== "off")
-              opts.push({ value: "apps", label: "Apps", tooltip: "Per-app usage" })
+              opts.push({ value: "apps", label: "APPS", tooltip: "Per-app usage" })
             return opts
           }
           value: root.currentView
           foreground: root.contentForeground
           fontFamily: root.contentFontFamily
-          fontSize: Style.font.caption
+          fontSize: Style.font.body
           focusable: false
           onChanged: function(v) { root.currentView = v }
         }
