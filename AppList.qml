@@ -262,9 +262,10 @@ Column {
 
   Button {
     visible: (root.apps || []).length > 6
-    text: root.showMore ? "Show less" : "Show more (" + ((root.apps || []).length - 6) + ")"
+    text: root.showMore ? "SHOW LESS" : "SHOW MORE (" + ((root.apps || []).length - 6) + ")"
     tooltipText: root.showMore ? "Show fewer apps" : "Show all apps"
-    foreground: Qt.darker(root.foreground, 1.2)
+    bordered: true
+    foreground: root.foreground
     fontFamily: root.fontFamily
     fontSize: Style.font.caption
     horizontalPadding: Style.spacing.controlGap

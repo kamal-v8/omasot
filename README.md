@@ -5,9 +5,9 @@ A lightweight screen time tracker plugin for the [Omarchy](https://omarchy.org/)
 ## Features
 
 - **Bar widget** — displays total screen time today (e.g. `2h 34m`)
-- **Hourly chart** — click the widget to see a 24-hour bar chart of usage
-- **Weekly stats** — expand the "This week" dropdown for a 7-day breakdown; hide it anytime from the settings (gear) section
-- **App stats** — weekly per-app usage with Mon–Sun bars, week total and share of 168h; click a day for its top apps (top-6 + Other with time and % share, Show more expands all)
+- **Daily view** — hourly bars with a right-hand value axis; unused small hours collapse into one narrow `0–9` block so the hours you use get the width
+- **Weekly view** — Mon–Sun bars with a value axis, week total and share of 168h, and a FOCUSED / OVERALL switch: focused counts only time attributed to an app, overall adds idle, lock and empty-desktop time
+- **App stats** — per-app usage for today or any day you click in the weekly chart (top-6 + Other with time and % share, plus an Idle / other row so the day reconciles); Show more expands all
 - **Identity modes** — Simple records window class only (e.g. zen/foot); Smart resolves the foreground process inside terminals (e.g. opencode not foot), uses the game title for steam_app_<id>, and shortens reverse-DNS names
 - **Private by design** — window titles are never stored except Steam game titles; fully local, no network access
 - **Tracking Modes** — use the mode switch in the panel to switch between "Active" (measures only actively used time) and "Always" (measures total screen-on time, whether being used or unused)
@@ -53,15 +53,16 @@ Click the widget to open the details panel. Press Escape to close it. Click the
 mode switch in the top-right of the panel to switch between `Active` and
 `Always` tracking.
 
-The Apps section shows weekly per-app usage:
+The Weekly view shows the week at a glance; the Apps view breaks a day down:
 
-- Use the week pager (`‹ Sep 7 – 13, 2026 · W37 ›`) to move between weeks. Bars show Mon–Sun totals with the week total and share of 168h.
+- Use the week pager (`‹ Sep 7 – 13, 2026 · W37 ›`) to move between weeks. Bars show Mon–Sun totals with the week total and share of 168h. Switch FOCUSED / OVERALL to compare app-attributed time against total screen-on time; hovering a bar always shows both.
 - Click a day to see its top apps. Each row shows time and % share; top-6 plus Other are shown by default and Show more expands all.
 
 Click the gear icon for Settings:
 
-- Weekly stats toggle
-- App stats section toggle
+- Weekly view toggle
+- App view toggle
+- App icons toggle
 - Tracking mode: Off / Simple / Smart
 - History retention: 30 / 90 / 180 / 365 days (default 365, max 365)
 

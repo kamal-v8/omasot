@@ -4,11 +4,13 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// WeekChart — self-contained per-app weekly overview (Mon–Sun).
+// WeekChart — self-contained weekly overview (Mon–Sun) with a basis
+// switch: FOCUSED (time attributed to an app) or OVERALL (total
+// screen-on time, idle included).
 // Data contract: `tracker.py apps-week <offset>` prints
-// {"week_label": str, "days": [{"date": "YYYY-MM-DD", "label": "Mon",
-// "total": seconds, "apps": [{name, seconds}] up to 8} x7],
-// "week_total": seconds, "week_share": float}. Offset 0 = current week.
+// {"week_label": str, "days": [{"date", "label", "total": focused_sec,
+// "day_total": screen_on_sec, "unattributed": sec, "apps": [...]} x7],
+// "week_total": focused_sec, "week_share": float}. Offset 0 = current week.
 Column {
   id: root
   width: parent.width
@@ -17,6 +19,10 @@ Column {
   // ── In: theming from host panel ─────────────────────────────────
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
+
+  // "focused" | "overall" — owned by the host panel so it survives view
+  // switches (this component is recreated by a Loader each time).
+  property string basis: "focused"
 
   // ── State ───────────────────────────────────────────────────────
   property int weekOffset: 0
@@ -28,28 +34,46 @@ Column {
 
   signal daySelected(string dateStr, var dayData)
 
-  // YYYY-MM-DD for today, built manually from Date parts.
   readonly property string todayStr: {
     var d = new Date()
     var mo = d.getMonth() + 1
     var dy = d.getDate()
-    var mStr = mo < 10 ? "0" + mo : "" + mo
-    var dStr = dy < 10 ? "0" + dy : "" + dy
-    return d.getFullYear() + "-" + mStr + "-" + dStr
+    return d.getFullYear() + "-" + (mo < 10 ? "0" + mo : "" + mo) + "-" + (dy < 10 ? "0" + dy : "" + dy)
   }
 
-  // Bar denominator: never below 1h so an empty week stays flat and safe.
+  readonly property bool overall: basis === "overall"
+
+  // Value for a day under the active basis.
+  function dayValue(day) {
+    if (!day) return 0
+    return root.overall ? (day.day_total || 0) : (day.total || 0)
+  }
+
+  readonly property int basisTotal: {
+    var t = 0
+    if (root.days) {
+      for (var i = 0; i < root.days.length; i++)
+        t += root.dayValue(root.days[i])
+    }
+    return t
+  }
+
+  readonly property real basisShare: Math.round(1000 * root.basisTotal / (7 * 24 * 3600)) / 10
+
+  // Bar denominator: the busiest day on the active basis, floor 1h.
   readonly property int maxDayTotal: {
     var m = 0
     if (root.days) {
       for (var i = 0; i < root.days.length; i++) {
-        var t = root.days[i].total || 0
-        if (t > m)
-          m = t
+        var t = root.dayValue(root.days[i])
+        if (t > m) m = t
       }
     }
     return Math.max(3600, m)
   }
+
+  readonly property real axisW: Style.space(44)
+  readonly property real barsW: Math.max(1, width - root.axisW)
 
   function formatTime(sec) {
     var s = Math.floor(sec || 0)
@@ -63,8 +87,7 @@ Column {
     return mm + "m"
   }
 
-  // Compact per-day value for the ~36px label columns: "11.8h", "45m", "0m".
-  // Tooltips keep formatTime ("11h 50m") so precision stays one hover away.
+  // Compact label for the narrow day columns: "11.8h", "45m", "0m".
   function dayHours(sec) {
     var s = Math.floor(sec || 0)
     if (s <= 0)
@@ -95,7 +118,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       // U+F0141 chevron-left (same glyph as clock panel "Previous month").
-      iconText: "󰅁"
+      iconText: ""
       tooltipText: "Previous week"
       foreground: root.foreground
       fontFamily: root.fontFamily
@@ -107,7 +130,7 @@ Column {
       anchors.left: prevButton.right
       anchors.verticalCenter: parent.verticalCenter
       // U+F0142 chevron-right (same glyph as clock panel "Next month").
-      iconText: "󰅂"
+      iconText: ""
       tooltipText: "Next week"
       foreground: root.foreground
       fontFamily: root.fontFamily
@@ -131,16 +154,39 @@ Column {
     }
   }
 
-  Row {
-    id: summaryRow
-    anchors.right: parent.right
-    spacing: Style.space(4)
+  // ── Basis switch + summary ─────────────────────────────────────
+  // Plain Item, not a Row: a Row would size itself from the spacer below,
+  // which in turn measures the Row — a circular binding that collapsed
+  // the whole strip.
+  Item {
+    width: parent.width
+    height: Math.max(basisGroup.implicitHeight, summaryText.height, helpButton.height)
+
+    ButtonGroup {
+      id: basisGroup
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      options: [
+        { value: "focused", label: "FOCUSED", tooltip: "Time attributed to a focused app" },
+        { value: "overall", label: "OVERALL", tooltip: "All screen-on time, including idle" }
+      ]
+      value: root.basis
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: Style.font.caption
+      focusable: false
+      onChanged: function(v) { root.basis = v }
+    }
 
     Text {
       id: summaryText
+      anchors.right: helpButton.left
+      anchors.rightMargin: Style.space(4)
       anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(0, parent.width - basisGroup.width - helpButton.width - Style.space(24))
+      horizontalAlignment: Text.AlignRight
       elide: Text.ElideRight
-      text: root.formatTime(root.weekTotal) + " · " + root.weekShare + "%"
+      text: root.formatTime(root.basisTotal) + " · " + root.basisShare + "%"
       textFormat: Text.PlainText
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -149,22 +195,54 @@ Column {
 
     PanelActionButton {
       id: helpButton
+      anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Weekly focused-app totals, Monday to Sunday. Idle time is not attributed to any day. Click a bar to inspect that day."
+      tooltipText: "Weekly totals, Monday to Sunday. Focused counts only time attributed to an app; overall adds idle, lock and empty-desktop time. Click a bar to inspect that day."
       foreground: root.foreground
       fontFamily: root.fontFamily
     }
   }
 
-  // ── Bars: one bottom-anchored column per day ────────────────────
+  // ── Bars with a right-hand value axis ─────────────────────────
   Item {
     id: bars
     width: parent.width
-    height: Style.space(64)
+    height: Style.space(72)
+
+    Repeater {
+      model: 3
+      Item {
+        required property int index
+        width: parent.width
+        height: 1
+        y: parent.height - parent.height * (index / 2)
+
+        Rectangle {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          height: 1
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, index === 0 ? 0.22 : 0.10)
+        }
+
+        Text {
+          anchors.left: parent.left
+          anchors.leftMargin: root.barsW + Style.space(6)
+          anchors.verticalCenter: parent.verticalCenter
+          text: root.dayHours(root.maxDayTotal * (index / 2))
+          textFormat: Text.PlainText
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          color: Qt.darker(root.foreground, 1.5)
+        }
+      }
+    }
 
     Row {
-      anchors.fill: parent
+      id: barsRow
+      width: root.barsW
+      height: parent.height
       spacing: Style.space(4)
 
       Repeater {
@@ -175,21 +253,21 @@ Column {
           width: (parent.width - (6 * Style.space(4))) / 7
           height: parent.height
 
-          property int total: modelData.total || 0
+          property int value: root.dayValue(modelData)
           property string dayDate: modelData.date || ""
           property bool isSelected: root.selectedDate !== "" && root.selectedDate === dayDate
 
           Rectangle {
             anchors.bottom: parent.bottom
             width: parent.width
-            height: Math.max(1, (total / root.maxDayTotal) * parent.height)
-            color: isSelected ? Color.accent : (total > 0 ? root.foreground : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1))
+            height: Math.max(1, (value / root.maxDayTotal) * parent.height)
+            color: isSelected ? Color.accent : (value > 0 ? root.foreground : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1))
             radius: Math.min(Style.space(4), width / 2)
           }
 
           PanelToolTip {
             visible: barMouse.containsMouse
-            text: (modelData.label || "") + " " + dayDate + " - " + root.formatTime(total)
+            text: (modelData.label || "") + " " + dayDate + " — " + root.formatTime(modelData.total || 0) + " focused, " + root.formatTime(modelData.day_total || 0) + " total"
             fontFamily: root.fontFamily
           }
 
@@ -197,13 +275,11 @@ Column {
             id: barMouse
             anchors.fill: parent
             hoverEnabled: true
-            // LeftButton (not NoButton): this area is clickable — it sets
-            // the selection and emits daySelected. Hover-only areas below
-            // use Qt.NoButton per the Panel pattern.
+            // LeftButton (not NoButton): this area is clickable — it emits
+            // daySelected. Hover-only areas use Qt.NoButton per the Panel
+            // pattern so panel scrolling still works.
             acceptedButtons: Qt.LeftButton
-            onClicked: {
-              root.daySelected(dayDate, modelData)
-            }
+            onClicked: root.daySelected(dayDate, modelData)
           }
         }
       }
@@ -212,7 +288,7 @@ Column {
 
   // ── Day labels (today in bold) ──────────────────────────────────
   Row {
-    width: parent.width
+    width: root.barsW
     spacing: Style.space(4)
 
     Repeater {
@@ -224,15 +300,14 @@ Column {
         height: Style.space(32)
 
         property bool isToday: (modelData.date || "") === root.todayStr && (modelData.date || "") !== ""
-        property int total: modelData.total || 0
 
-                Column {
-                  anchors.centerIn: parent
-                  spacing: 0
+        Column {
+          anchors.centerIn: parent
+          spacing: 0
 
-                  Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: (modelData.label || "").toUpperCase()
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: (modelData.label || "").toUpperCase()
             textFormat: Text.PlainText
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -242,7 +317,7 @@ Column {
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.dayHours(total)
+            text: root.dayHours(root.dayValue(modelData))
             textFormat: Text.PlainText
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

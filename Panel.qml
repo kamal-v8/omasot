@@ -30,6 +30,7 @@ Panel {
   // Inspector state shared with whichever view is instantiated. Views
   // come and go via viewLoader, so selection lives here, not in them.
   property string selectedDateStr: ""
+  property string weekBasis: "focused"
   property string inspectorTitle: "Today"
   property int inspectorTotal: 0
   property int inspectorDayTotal: 0
@@ -68,7 +69,11 @@ Panel {
   // Panel breathing room. These margins sit inside the card, so the card
   // must also be grown by them — fittedContentHeight only accounts for
   // the card's own fixed padding, not ours.
-  readonly property real contentPad: Style.space(16)
+  readonly property real contentPad: Style.space(20)
+
+  // Daily draws 24 labelled hour columns, so it needs more room than the
+  // week and app views.
+  readonly property int viewWidth: root.currentView === "daily" ? Style.space(660) : Style.space(440)
 
   function open() {
     if (hostWidget && typeof hostWidget.refresh === "function") hostWidget.refresh()
@@ -98,7 +103,7 @@ Panel {
     bar: root.bar
     open: root.opened
     centerOnBar: true
-    contentWidth: panel.fittedContentWidth(Style.space(440))
+    contentWidth: panel.fittedContentWidth(root.viewWidth)
     contentHeight: panel.fittedContentHeight(content.implicitHeight + root.contentPad * 2)
 
     PanelKeyCatcher {
@@ -465,6 +470,8 @@ Panel {
             foreground: root.contentForeground
             fontFamily: root.contentFontFamily
             selectedDate: root.selectedDateStr
+            basis: root.weekBasis
+            onBasisChanged: root.weekBasis = basis
             onDaySelected: function(dateStr, dayData) {
               root.selectedDateStr = dateStr
               root.inspectorTitle = (dayData.label || "") + " " + (dateStr || "")
