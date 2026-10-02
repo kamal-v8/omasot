@@ -65,6 +65,11 @@ Panel {
   readonly property color contentForeground: bar ? bar.foreground : Color.foreground
   readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
 
+  // Panel breathing room. These margins sit inside the card, so the card
+  // must also be grown by them — fittedContentHeight only accounts for
+  // the card's own fixed padding, not ours.
+  readonly property real contentPad: Style.space(16)
+
   function open() {
     if (hostWidget && typeof hostWidget.refresh === "function") hostWidget.refresh()
     root.syncAppList()
@@ -94,7 +99,7 @@ Panel {
     open: root.opened
     centerOnBar: true
     contentWidth: panel.fittedContentWidth(Style.space(440))
-    contentHeight: panel.fittedContentHeight(content.implicitHeight)
+    contentHeight: panel.fittedContentHeight(content.implicitHeight + root.contentPad * 2)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -104,7 +109,7 @@ Panel {
       Flickable {
         id: contentScroll
         anchors.fill: parent
-        anchors.margins: Style.space(16)
+        anchors.margins: root.contentPad
         contentWidth: width
         contentHeight: content.implicitHeight
         clip: true
@@ -502,11 +507,6 @@ Panel {
               } catch(e) {}
             }
           }
-        }
-
-        Item {
-          width: parent.width
-          height: Style.space(12)
         }
         }
       }
