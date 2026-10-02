@@ -202,7 +202,6 @@ Column {
             // use Qt.NoButton per the Panel pattern.
             acceptedButtons: Qt.LeftButton
             onClicked: {
-              root.selectedDate = dayDate
               root.daySelected(dayDate, modelData)
             }
           }

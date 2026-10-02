@@ -27,6 +27,22 @@ Panel {
 
   property string currentView: "daily"
 
+  // Inspector state shared with whichever view is instantiated. Views
+  // come and go via viewLoader, so selection lives here, not in them.
+  property string selectedDateStr: ""
+  property string inspectorTitle: "Today"
+  property int inspectorTotal: 0
+  property int inspectorDayTotal: 0
+  property int inspectorUnattributed: 0
+  property var inspectorApps: []
+
+  readonly property string todayStr: {
+    var d = new Date()
+    var mo = d.getMonth() + 1
+    var dy = d.getDate()
+    return d.getFullYear() + "-" + (mo < 10 ? "0" + mo : "" + mo) + "-" + (dy < 10 ? "0" + dy : "" + dy)
+  }
+
   function runSettings(args) {
     var cmd = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", "")]
     settingsProcess.command = cmd.concat(args)
@@ -35,14 +51,14 @@ Panel {
   }
 
   function syncAppList() {
-    if (weekChart.selectedDate === "" || weekChart.selectedDate === weekChart.todayStr) {
+    if (root.selectedDateStr === "" || root.selectedDateStr === root.todayStr) {
       var t = root.appsToday
-      weekChart.selectedDate = weekChart.todayStr
-      appList.title = "Today"
-      appList.totalSeconds = t.total || 0
-      appList.dayTotalSeconds = t.day_total || 0
-      appList.unattributedSeconds = t.unattributed || 0
-      appList.apps = t.apps || []
+      root.selectedDateStr = root.todayStr
+      root.inspectorTitle = "Today"
+      root.inspectorTotal = t.total || 0
+      root.inspectorDayTotal = t.day_total || 0
+      root.inspectorUnattributed = t.unattributed || 0
+      root.inspectorApps = t.apps || []
     }
   }
 
@@ -51,8 +67,8 @@ Panel {
 
   function open() {
     if (hostWidget && typeof hostWidget.refresh === "function") hostWidget.refresh()
-    weekChart.refresh()
     root.syncAppList()
+    if (viewLoader.item && typeof viewLoader.item.refresh === "function") viewLoader.item.refresh()
     root.controller.show()
   }
   
@@ -419,35 +435,55 @@ Panel {
           onChanged: function(v) { root.currentView = v }
         }
 
-        DailyCard {
-          visible: root.currentView === "daily"
-          totalText: hostWidget ? hostWidget.displayText : "0m"
-          todayData: root.todayData
-          maxMinutes: root.maxMinutes
-          foreground: root.contentForeground
-          fontFamily: root.contentFontFamily
+        Loader {
+          id: viewLoader
+          width: parent.width
+          sourceComponent: root.currentView === "weekly" && root.showWeekly ? weeklyComp : (root.currentView === "apps" && root.showApps && root.appMode !== "off") ? appsComp : dailyComp
         }
 
-        WeekChart {
-          id: weekChart
-          visible: root.showWeekly && root.currentView === "weekly"
-          foreground: root.contentForeground
-          fontFamily: root.contentFontFamily
+        Component {
+          id: dailyComp
+
+          DailyCard {
+            totalText: hostWidget ? hostWidget.displayText : "0m"
+            todayData: root.todayData
+            maxMinutes: root.maxMinutes
+            foreground: root.contentForeground
+            fontFamily: root.contentFontFamily
+          }
+        }
+
+        Component {
+          id: weeklyComp
+
+          WeekChart {
+            foreground: root.contentForeground
+            fontFamily: root.contentFontFamily
+            selectedDate: root.selectedDateStr
             onDaySelected: function(dateStr, dayData) {
-              appList.title = (dayData.label || "") + " " + (dateStr || "")
-              appList.totalSeconds = dayData.total || 0
-              appList.dayTotalSeconds = dayData.day_total || 0
-              appList.unattributedSeconds = dayData.unattributed || 0
-              appList.apps = dayData.apps || []
+              root.selectedDateStr = dateStr
+              root.inspectorTitle = (dayData.label || "") + " " + (dateStr || "")
+              root.inspectorTotal = dayData.total || 0
+              root.inspectorDayTotal = dayData.day_total || 0
+              root.inspectorUnattributed = dayData.unattributed || 0
+              root.inspectorApps = dayData.apps || []
             }
+          }
         }
 
-        AppList {
-          id: appList
-          visible: root.currentView === "apps" && root.showApps && root.appMode !== "off"
-          foreground: root.contentForeground
-          fontFamily: root.contentFontFamily
-          showIcons: root.showAppIcons
+        Component {
+          id: appsComp
+
+          AppList {
+            title: root.inspectorTitle
+            totalSeconds: root.inspectorTotal
+            dayTotalSeconds: root.inspectorDayTotal
+            unattributedSeconds: root.inspectorUnattributed
+            apps: root.inspectorApps
+            foreground: root.contentForeground
+            fontFamily: root.contentFontFamily
+            showIcons: root.showAppIcons
+          }
         }
 
         Process {
