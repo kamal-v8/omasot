@@ -14,7 +14,10 @@ Panel {
   readonly property var barIdentity: hostWidget || root
 
   property var todayData: hostWidget ? (hostWidget.screentimeData.today_data || ({})) : ({})
-  property int maxMinutes: Math.max(60, Object.values(todayData).reduce(function(a, b) { return Math.max(a, b) }, 0))
+
+  // today_data holds SECONDS per hour, so the scale floor is one hour
+  // in seconds (3600).
+  property int maxSeconds: Math.max(3600, Object.values(todayData).reduce(function(a, b) { return Math.max(a, b) }, 0))
 
   property bool showWeekly: hostWidget ? hostWidget.screentimeData.show_weekly !== false : true
   property bool settingsExpanded: false
@@ -69,11 +72,11 @@ Panel {
   // Panel breathing room. These margins sit inside the card, so the card
   // must also be grown by them — fittedContentHeight only accounts for
   // the card's own fixed padding, not ours.
-  readonly property real contentPad: Style.space(20)
+  readonly property real contentPad: Style.space(12)
 
-  // Daily draws 24 labelled hour columns, so it needs more room than the
-  // week and app views.
-  readonly property int viewWidth: root.currentView === "daily" ? Style.space(660) : Style.space(440)
+  // Daily gets the narrow width — the active-hour collapse (both ends)
+  // keeps the bars filling it.
+  readonly property int viewWidth: root.currentView === "daily" ? Style.space(400) : Style.space(440)
 
   function open() {
     if (hostWidget && typeof hostWidget.refresh === "function") hostWidget.refresh()
@@ -124,7 +127,7 @@ Panel {
         Column {
           id: content
           width: contentScroll.width
-          spacing: Style.space(12)
+          spacing: Style.space(8)
 
         Item {
           width: parent.width
@@ -134,7 +137,7 @@ Panel {
             id: titleText
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: "Screen Time Today"
+            text: "Screen Time"
             font.family: root.contentFontFamily
             font.pixelSize: Style.font.body
             font.bold: true
@@ -167,7 +170,7 @@ Panel {
 
             PanelToolTip {
               visible: modeSwitch.containsMouse
-              text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Tracking all screen-on time. Click to track active use only." : "Tracking active use only. Click to track all screen-on time."
+              text: (hostWidget && hostWidget.screentimeData.mode === "always") ? "Tracking all screen-on time, even with no window focused. Click to track focused use only." : "Tracking only while the screen is on, unlocked and a window is focused. Click to track all screen-on time."
               fontFamily: root.contentFontFamily
             }
           }
@@ -178,7 +181,7 @@ Panel {
             anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             iconText: "?"
-            tooltipText: "Always counts all screen-on time. Active pauses while idle. Per-app stats only count focused use."
+            tooltipText: "Always counts all screen-on time. Active counts only while a window is focused. Per-app stats follow the focused window."
             foreground: Qt.darker(root.contentForeground, 1.2)
             fontFamily: root.contentFontFamily
             fontSize: Style.font.caption
@@ -218,7 +221,7 @@ Panel {
         Column {
           width: parent.width
           visible: root.settingsExpanded
-          spacing: Style.space(12)
+          spacing: Style.space(8)
 
           BorderSurface {
             width: parent.width
@@ -457,7 +460,7 @@ Panel {
           DailyCard {
             totalText: hostWidget ? hostWidget.displayText : "0m"
             todayData: root.todayData
-            maxMinutes: root.maxMinutes
+            maxSeconds: root.maxSeconds
             foreground: root.contentForeground
             fontFamily: root.contentFontFamily
           }

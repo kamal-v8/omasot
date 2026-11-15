@@ -5,8 +5,8 @@ import qs.Commons
 import qs.Ui
 
 // WeekChart — self-contained weekly overview (Mon–Sun) with a basis
-// switch: FOCUSED (time attributed to an app) or OVERALL (total
-// screen-on time, idle included).
+// switch: FOCUSED (seconds attributed to the focused app) or OVERALL
+// (all screen-on time, including time with no app attributed).
 // Data contract: `tracker.py apps-week <offset>` prints
 // {"week_label": str, "days": [{"date", "label", "total": focused_sec,
 // "day_total": screen_on_sec, "unattributed": sec, "apps": [...]} x7],
@@ -167,8 +167,8 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       options: [
-        { value: "focused", label: "FOCUSED", tooltip: "Time attributed to a focused app" },
-        { value: "overall", label: "OVERALL", tooltip: "All screen-on time, including idle" }
+        { value: "focused", label: "FOCUSED", tooltip: "Seconds attributed to the focused app" },
+        { value: "overall", label: "OVERALL", tooltip: "All screen-on time, including time with no app attributed" }
       ]
       value: root.basis
       foreground: root.foreground
@@ -198,7 +198,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Weekly totals, Monday to Sunday. Focused counts only time attributed to an app; overall adds idle, lock and empty-desktop time. Click a bar to inspect that day."
+      tooltipText: "Weekly totals, Monday to Sunday. Focused counts only seconds attributed to the focused app; overall is all screen-on time (display on, session unlocked). Click a bar to inspect that day."
       foreground: root.foreground
       fontFamily: root.fontFamily
     }

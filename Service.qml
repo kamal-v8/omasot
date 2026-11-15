@@ -1,53 +1,30 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
 Item {
   id: root
   property var shell: null
-  
-  IdleMonitor {
-    id: idleMonitor
-    timeout: 60
-    respectInhibitors: true
-  }
 
   Process {
-    id: recordProcess
+    id: tickProcess
   }
 
-  Process {
-    id: appRecordProcess
-  }
-
-  // Timer to record every minute
+  // One accounting tick every 5 seconds. The tracker derives the elapsed
+  // time from its own _last_tick stamp, so a skipped tick is credited on
+  // the next one — nothing is lost, and there is nothing to fix here.
   Timer {
-    id: recordTimer
-    interval: 60000
-    repeat: true
-    running: true
-    onTriggered: {
-      var isIdleStr = idleMonitor.isIdle ? "idle" : "active"
-      recordProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record", isIdleStr]
-      recordProcess.running = true
-    }
-  }
-
-  // Timer to record per-app usage every 5s
-  Timer {
-    id: appRecordTimer
+    id: tickTimer
     interval: 5000
     repeat: true
     running: true
     onTriggered: {
-      if (appRecordProcess.running)
+      if (tickProcess.running)
         return
-      var isIdleStr = idleMonitor.isIdle ? "idle" : "active"
-      appRecordProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "record-app", isIdleStr]
-      appRecordProcess.running = true
+      tickProcess.command = ["python3", Qt.resolvedUrl("tracker.py").toString().replace("file://", ""), "tick"]
+      tickProcess.running = true
     }
   }
 
-  Component.onCompleted: console.log("Screentime service started.")
+  Component.onCompleted: console.log("Screentime service started (presence-based ticker).")
 }

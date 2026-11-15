@@ -43,7 +43,8 @@ Column {
   }
 
   // Share basis: the full screen-on day when known (so app rows and
-  // the Idle row share one scale and reconcile), else the focused total.
+  // the unattributed row share one scale and reconcile), else the
+  // focused total.
   readonly property int shareBase: Math.max(1, root.dayTotalSeconds > 0 ? root.dayTotalSeconds : root.totalSeconds)
 
   // Collapsed view shows the first 6 apps plus an aggregated "Other" row
@@ -70,7 +71,7 @@ Column {
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       elide: Text.ElideRight
-      text: (root.title.length > 0 ? root.title + " · " : "") + root.formatTime(root.totalSeconds) + (root.dayTotalSeconds > root.totalSeconds ? " of " + root.formatTime(root.dayTotalSeconds) : "")
+      text: root.title.length > 0 ? root.title : "Apps"
       font.family: root.fontFamily
       font.pixelSize: Style.font.body
       font.bold: true
@@ -82,9 +83,91 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Top apps by focused time. Idle time is listed first. Click a day in the weekly chart to inspect it."
+      tooltipText: "Top apps by focused time. Focused = seconds attributed to the focused app; overall = all screen-on time. Unattributed time is listed first. Click a day in the weekly chart to inspect it."
       foreground: root.foreground
       fontFamily: root.fontFamily
+    }
+  }
+
+  // ── FOCUSED vs OVERALL ──────────────────────────────────────────
+  // Focused = seconds attributed to the focused app (what the rows
+  // below sum to). Overall = all screen-on time (display on, session
+  // unlocked). The gap is the UNATTRIBUTED row below.
+  Item {
+    width: parent.width
+    height: Math.max(focusedBlock.height, overallBlock.height)
+    visible: root.totalSeconds > 0 || root.dayTotalSeconds > 0
+
+    Column {
+      id: focusedBlock
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 0
+
+      Text {
+        text: "FOCUSED"
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        color: Qt.darker(root.foreground, 1.5)
+      }
+
+      Text {
+        text: root.formatTime(root.totalSeconds)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.title
+        font.bold: true
+        color: Color.accent
+      }
+    }
+
+    Column {
+      id: overallBlock
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 0
+
+      Text {
+        anchors.right: parent.right
+        text: "OVERALL"
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        color: Qt.darker(root.foreground, 1.5)
+      }
+
+      Text {
+        anchors.right: parent.right
+        text: root.formatTime(root.dayTotalSeconds > 0 ? root.dayTotalSeconds : root.totalSeconds)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.title
+        font.bold: true
+        color: root.foreground
+      }
+    }
+
+    Text {
+      visible: root.dayTotalSeconds > root.totalSeconds
+      anchors.centerIn: parent
+      // dayTotalSeconds is 0 for a day with no screen-on time — guard the
+      // divide so the label can never render "NaN% focused".
+      text: root.dayTotalSeconds > 0 ? Math.round(100 * root.totalSeconds / root.dayTotalSeconds) + "% focused" : ""
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      color: Qt.darker(root.foreground, 1.5)
+    }
+
+    PanelToolTip {
+      visible: statsMouse.containsMouse
+      text: "Focused = seconds attributed to the focused app. Overall = all screen-on time (display on, session unlocked)."
+      fontFamily: root.fontFamily
+    }
+
+    MouseArea {
+      id: statsMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
     }
   }
 
@@ -98,7 +181,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       width: Style.space(90)
       elide: Text.ElideRight
-      text: "IDLE / OTHER"
+      text: "UNATTRIBUTED"
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       color: Qt.darker(root.foreground, 1.5)
@@ -142,13 +225,13 @@ Column {
     }
 
     PanelToolTip {
-      visible: idleMouse.containsMouse
-      text: "Screen-on time with no focused app — idle, lock screen, or empty desktop."
+      visible: unattributedMouse.containsMouse
+      text: "Screen-on time with no app attributed — an empty desktop, or a focused window the tracker could not name."
       fontFamily: root.fontFamily
     }
 
     MouseArea {
-      id: idleMouse
+      id: unattributedMouse
       anchors.fill: parent
       hoverEnabled: true
       acceptedButtons: Qt.NoButton
