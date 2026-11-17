@@ -28,6 +28,12 @@ Panel {
   property int retentionDays: hostWidget ? (hostWidget.screentimeData.retention_days || 365) : 365
   property var appsToday: hostWidget ? (hostWidget.screentimeData.apps_today || {}) : {}
 
+  // Screen time reminders (Android Digital Wellbeing style). On by default,
+  // like Android. The floating overlay reads the same settings from the
+  // tracker's JSON payload through `tracker.py reminder`.
+  property bool remindersEnabled: hostWidget ? hostWidget.screentimeData.screen_time_reminders !== false : true
+  property int reminderInterval: hostWidget ? (hostWidget.screentimeData.reminder_interval_minutes || 30) : 30
+
   property string currentView: "daily"
 
   // Inspector state shared with whichever view is instantiated. Views
@@ -83,6 +89,10 @@ Panel {
     root.syncAppList()
     if (viewLoader.item && typeof viewLoader.item.refresh === "function") viewLoader.item.refresh()
     root.controller.show()
+    // A click on the bar widget can leave keyboard focus on the bar, which
+    // would swallow Escape. Make sure the key catcher inside the panel owns
+    // focus so Escape always reaches onCloseRequested.
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
   
   function close() {
@@ -105,6 +115,10 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
+    // Without a focus target no item inside the layer-shell surface gets
+    // active focus, so PanelKeyCatcher never sees Escape and the panel
+    // cannot be closed with the keyboard.
+    focusTarget: keyCatcher
     centerOnBar: true
     contentWidth: panel.fittedContentWidth(root.viewWidth)
     contentHeight: panel.fittedContentHeight(content.implicitHeight + root.contentPad * 2)
@@ -218,125 +232,191 @@ Panel {
           }
         }
 
-        Column {
+        // All settings in one compact box instead of a tall stack of cards.
+        BorderSurface {
           width: parent.width
           visible: root.settingsExpanded
-          spacing: Style.space(8)
+          implicitHeight: compactSettings.implicitHeight + Style.space(18)
+          color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
+          radius: Style.cornerRadius
+          borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
 
-          BorderSurface {
-            width: parent.width
-            implicitHeight: sectionsBox.implicitHeight + 24
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
+          Column {
+            id: compactSettings
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Style.space(9)
+            spacing: Style.space(6)
 
-            Column {
-              id: sectionsBox
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: Style.space(8)
+            // One label column for every row so "REMIND AFTER" is never
+            // clipped and the option groups line up vertically.
+            readonly property int labelWidth: Style.space(80)
 
-              Text {
-                text: "SECTIONS"
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                color: Qt.darker(root.contentForeground, 1.2)
-              }
+            // Row 1 — the four on/off switches, inline.
+            Item {
+              width: parent.width
+              height: Style.space(60)
 
-              Row {
-                spacing: Style.space(16)
+              Grid {
+                id: toggles
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                columns: 2
+                rowSpacing: Style.space(5)
+                columnSpacing: Style.space(18)
 
-              Row {
-                spacing: Style.space(8)
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "WEEKLY"
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
-                  color: Qt.darker(root.contentForeground, 1.2)
+                Row {
+                  spacing: Style.space(3)
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "WEEKLY"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
+                  ToggleSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: root.showWeekly
+                    foreground: root.contentForeground
+                    busy: settingsProcess.running
+                    onToggled: root.runSettings(["toggle-weekly"])
+                  }
                 }
 
-                ToggleSwitch {
-                  anchors.verticalCenter: parent.verticalCenter
-                  checked: root.showWeekly
-                  foreground: root.contentForeground
-                  busy: settingsProcess.running
-                  onToggled: root.runSettings(["toggle-weekly"])
-                }
-              }
-
-              Row {
-                spacing: Style.space(8)
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "APPS"
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
-                  color: Qt.darker(root.contentForeground, 1.2)
+                Row {
+                  spacing: Style.space(3)
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "APPS"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
+                  ToggleSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: root.showApps
+                    foreground: root.contentForeground
+                    busy: settingsProcess.running
+                    onToggled: root.runSettings(["toggle-apps-show"])
+                  }
                 }
 
-                ToggleSwitch {
-                  anchors.verticalCenter: parent.verticalCenter
-                  checked: root.showApps
-                  foreground: root.contentForeground
-                  busy: settingsProcess.running
-                  onToggled: root.runSettings(["toggle-apps-show"])
-                }
-              }
-
-              Row {
-                spacing: Style.space(8)
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "ICONS"
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
-                  color: Qt.darker(root.contentForeground, 1.2)
+                Row {
+                  spacing: Style.space(3)
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "ICONS"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
+                  ToggleSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: root.showAppIcons
+                    foreground: root.contentForeground
+                    busy: settingsProcess.running
+                    onToggled: root.runSettings(["toggle-app-icons"])
+                  }
                 }
 
-                ToggleSwitch {
-                  anchors.verticalCenter: parent.verticalCenter
-                  checked: root.showAppIcons
-                  foreground: root.contentForeground
-                  busy: settingsProcess.running
-                  onToggled: root.runSettings(["toggle-app-icons"])
+                Row {
+                  spacing: Style.space(3)
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "REMIND"
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    color: Qt.darker(root.contentForeground, 1.2)
+                  }
+                  ToggleSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: root.remindersEnabled
+                    foreground: root.contentForeground
+                    busy: settingsProcess.running
+                    onToggled: root.runSettings(["toggle-reminders"])
+                  }
                 }
-              }
               }
             }
-          }
 
-          BorderSurface {
-            width: parent.width
-            implicitHeight: identBox.implicitHeight + 24
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
-
-            Column {
-              id: identBox
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: Style.space(8)
+            // Row 2 — reminder interval.
+            Item {
+              width: parent.width
+              height: Style.space(28)
+              visible: root.remindersEnabled
 
               Row {
-                spacing: Style.space(4)
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
 
                 Text {
+                  width: compactSettings.labelWidth
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "APP IDENTIFICATION"
+                  text: "REMIND AFTER"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
-                  font.bold: true
-                  color: Qt.darker(root.contentForeground, 1.2)
+                  color: Qt.darker(root.contentForeground, 1.5)
+                }
+
+                ButtonGroup {
+                  options: [
+                    { value: "5", label: "5m", tooltip: "Remind after 5 minutes in the same app" },
+                    { value: "10", label: "10m", tooltip: "Remind after 10 minutes in the same app" },
+                    { value: "20", label: "20m", tooltip: "Remind after 20 minutes in the same app" },
+                    { value: "30", label: "30m", tooltip: "Remind after 30 minutes in the same app" }
+                  ]
+                  value: String(root.reminderInterval)
+                  foreground: root.contentForeground
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                  focusable: false
+                  onChanged: function(v) { root.runSettings(["set-reminder-interval", v]) }
+                }
+
+                PanelActionButton {
+                  anchors.verticalCenter: parent.verticalCenter
+                  iconText: "?"
+                  tooltipText: "A small pill shows how long you've used the focused app. Requires app identification to be Simple or Smart."
+                  foreground: Qt.darker(root.contentForeground, 1.2)
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                }
+              }
+            }
+
+            // Row 3 — app identification.
+            Item {
+              width: parent.width
+              height: Style.space(28)
+
+              Row {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
+
+                Text {
+                  width: compactSettings.labelWidth
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "APP ID"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.5)
+                }
+
+                ButtonGroup {
+                  options: [
+                    { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
+                    { value: "class", label: "Simple", tooltip: "Track window class only" },
+                    { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
+                  ]
+                  value: root.appMode
+                  foreground: root.contentForeground
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                  focusable: false
+                  onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
                 }
 
                 PanelActionButton {
@@ -348,82 +428,49 @@ Panel {
                   fontSize: Style.font.caption
                 }
               }
-
-              ButtonGroup {
-                options: [
-                  { value: "off", label: "Off", tooltip: "Stop per-app tracking" },
-                  { value: "class", label: "Simple", tooltip: "Track window class only" },
-                  { value: "smart", label: "Smart", tooltip: "Resolve processes inside terminals" }
-                ]
-                value: root.appMode
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                fontSize: Style.font.caption
-                focusable: false
-                onChanged: function(v) { root.runSettings(["set-app-mode", v]) }
-              }
-
-              Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: "Simple tracks window names. Smart also sees inside terminals."
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                color: Qt.darker(root.contentForeground, 1.5)
-              }
             }
-          }
 
-          BorderSurface {
-            width: parent.width
-            implicitHeight: historyBox.implicitHeight + 24
-            color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.04)
-            radius: Style.cornerRadius
-            borderSpec: Border.flat(Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.10), 1)
-
-            Column {
-              id: historyBox
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: 12
-              spacing: Style.space(8)
+            // Row 4 — history retention.
+            Item {
+              width: parent.width
+              height: Style.space(28)
 
               Row {
-                spacing: Style.space(4)
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
+
+                Text {
+                  width: compactSettings.labelWidth
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "HISTORY"
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  color: Qt.darker(root.contentForeground, 1.5)
+                }
+
+                ButtonGroup {
+                  options: [
+                    { value: "30", label: "30d", tooltip: "Keep 30 days" },
+                    { value: "90", label: "90d", tooltip: "Keep 90 days" },
+                    { value: "180", label: "6mo", tooltip: "Keep 6 months" },
+                    { value: "365", label: "12mo", tooltip: "Keep 12 months" }
+                  ]
+                  value: String(root.retentionDays)
+                  foreground: root.contentForeground
+                  fontFamily: root.contentFontFamily
+                  fontSize: Style.font.caption
+                  focusable: false
+                  onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
+                }
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "KEEP HISTORY (" + root.retentionDays + " DAYS)"
+                  text: root.retentionDays + "d"
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.caption
-                  font.bold: true
-                  color: Qt.darker(root.contentForeground, 1.2)
+                  color: Qt.darker(root.contentForeground, 1.5)
                 }
-
-                PanelActionButton {
-                  anchors.verticalCenter: parent.verticalCenter
-                  iconText: "?"
-                  tooltipText: "How many days of per-day history are kept. Older days are pruned automatically."
-                  foreground: Qt.darker(root.contentForeground, 1.2)
-                  fontFamily: root.contentFontFamily
-                  fontSize: Style.font.caption
-                }
-              }
-
-              ButtonGroup {
-                options: [
-                  { value: "30", label: "30d", tooltip: "Keep 30 days" },
-                  { value: "90", label: "90d", tooltip: "Keep 90 days" },
-                  { value: "180", label: "6mo", tooltip: "Keep 6 months" },
-                  { value: "365", label: "12mo", tooltip: "Keep 12 months" }
-                ]
-                value: String(root.retentionDays)
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                fontSize: Style.font.caption
-                focusable: false
-                onChanged: function(v) { root.runSettings(["set-retention-days", v]) }
               }
             }
           }

@@ -25,6 +25,26 @@ NOMINAL_TICK_SECONDS = 5
 # tracker not running) must not dump hours into one bucket.
 MAX_ELAPSED_SECONDS = 60
 
+# ── Screen time reminders (Android Digital Wellbeing style) ──────────
+# A small, separate state file carries the *latest* reminder to the UI.
+# The UI polls `tracker.py reminder`; it only shows a payload whose nonce
+# it has not seen before and that is still fresh. This keeps the writer
+# (the 5s ticker) and the reader (the floating overlay) fully decoupled:
+# no IPC channel, no locks shared with the renderer, no "dismiss" write
+# back into the history file.
+REMINDER_FILE = STATE_FILE + ".reminder"
+DEFAULT_REMINDER_INTERVAL_MINUTES = 30
+MIN_REMINDER_INTERVAL_MINUTES = 1
+MAX_REMINDER_INTERVAL_MINUTES = 240
+# A reminder older than this is ignored. If the shell was not running when
+# the reminder fired, we must not pop a stale "30 minutes ago" card.
+REMINDER_MAX_AGE_SECONDS = 45
+
+# Defensive limits: a corrupt or hostile state file must not exhaust memory,
+# and window-class names must not turn into giant strings in the renderer.
+MAX_STATE_BYTES = 8 * 1024 * 1024
+MAX_APP_NAME_LENGTH = 200
+
 # Set by load_data() when the on-disk file still uses the old schema.
 _MIGRATION_PENDING = False
 
@@ -102,7 +122,7 @@ def clean_app_name(name):
             return None
         if not any(c.isalnum() for c in t):
             return None
-        return t
+        return t[:MAX_APP_NAME_LENGTH]
     except Exception:
         return None
 
@@ -382,6 +402,10 @@ def load_data():
     data = {}
     try:
         if os.path.exists(STATE_FILE):
+            # Bound the read: a corrupt/grown file must not be parsed into
+            # an unbounded object inside the long-lived shell process.
+            if os.path.getsize(STATE_FILE) > MAX_STATE_BYTES:
+                return {}
             with open(STATE_FILE, "r") as f:
                 loaded = json.load(f)
             if isinstance(loaded, dict):
@@ -461,6 +485,12 @@ def save_data(data):
     tmp_file = STATE_FILE + ".tmp"
     with open(tmp_file, "w") as f:
         json.dump(data, f)
+    # Usage history is private: keep it owner-readable only, including the
+    # reminder sidecar written by the same process.
+    try:
+        os.chmod(tmp_file, 0o600)
+    except OSError:
+        pass
     os.replace(tmp_file, STATE_FILE)
 
 
@@ -715,6 +745,11 @@ def tick(state="active"):
       per-app attribution always follows the focused window, no matter
       whether the mouse or keyboard was touched
 
+    Screen time reminders: while one app stays focused for a continuous
+    interval (default 30 minutes of counted use), a fresh reminder is
+    published to REMINDER_FILE for the floating overlay. Switching apps, or
+    losing presence, restarts the continuous session.
+
     `state` is accepted and ignored: the old idle/active hint came from
     an input-idle monitor that no longer exists.
     """
@@ -734,6 +769,10 @@ def tick(state="active"):
     except Exception:
         app_name = None
 
+    # Set inside mutate() under the state lock, written out after it so the
+    # (short) file I/O never runs while the lock is held.
+    pending_reminder = {}
+
     def mutate(data):
         now_epoch = time.time()
         elapsed = _elapsed_since(data.get("_last_tick"), now_epoch)
@@ -744,6 +783,22 @@ def tick(state="active"):
 
         presence = bool(display_on) and not locked
         count = presence and (mode == "always" or focused_window is not None)
+        reminders_enabled, reminder_interval = _get_reminder_settings(data)
+
+        # ── Continuous app-use session ───────────────────────────────
+        reminders = data.get("_reminders")
+        if not isinstance(reminders, dict):
+            reminders = {}
+        current_app = app_name or ""
+        if presence and count:
+            if reminders.get("session_app", "") != current_app:
+                reminders["session_app"] = current_app
+                reminders["session_seconds"] = 0
+        else:
+            # Dark, locked or unfocused breaks the session so a resumed app
+            # starts a fresh reminder interval.
+            reminders["session_app"] = ""
+            reminders["session_seconds"] = 0
 
         if count and elapsed > 0:
             now = datetime.datetime.now()
@@ -771,11 +826,37 @@ def tick(state="active"):
                     cur = 0
                 apps[app_name] = cur + elapsed
 
+                # Accumulate continuous use of this app and fire once the
+                # configured interval is crossed, then start a new session.
+                session_seconds = reminders.get("session_seconds", 0)
+                if isinstance(session_seconds, bool) or not isinstance(session_seconds, int):
+                    session_seconds = 0
+                session_seconds += elapsed
+                reminders["session_seconds"] = session_seconds
+
+                if (reminders_enabled and current_app
+                        and session_seconds >= reminder_interval * 60):
+                    app_total = apps.get(app_name, 0)
+                    if isinstance(app_total, bool) or not isinstance(app_total, int):
+                        app_total = 0
+                    pending_reminder["app"] = app_name
+                    pending_reminder["app_seconds"] = app_total
+                    pending_reminder["interval_minutes"] = reminder_interval
+                    pending_reminder["nonce"] = int(now_epoch * 1000)
+                    pending_reminder["created"] = now_epoch
+                    reminders["session_seconds"] = 0
+
+        data["_reminders"] = reminders
         # Always advance the stamp, even when nothing was counted, so
         # time spent dark, locked or unfocused is never credited later.
         data["_last_tick"] = now_epoch
 
     update_state(mutate)
+    if pending_reminder:
+        try:
+            write_reminder_file(pending_reminder)
+        except Exception:
+            pass
     print_today()
 
 
@@ -800,16 +881,55 @@ def toggle_mode():
     print_today()
 
 
+def _as_bool(value, default):
+    """Coerce a persisted setting to a real bool, tolerating 0/1 and strings."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        t = value.strip().lower()
+        if t in ("1", "true", "yes", "on"):
+            return True
+        if t in ("0", "false", "no", "off"):
+            return False
+    return default
+
+
+def _get_reminder_settings(data):
+    """Return (enabled, interval_minutes) for screen time reminders."""
+    settings = data.get("_settings", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    enabled = _as_bool(
+        settings.get("screen_time_reminders", True), True
+    )
+    try:
+        interval = int(settings.get(
+            "reminder_interval_minutes", DEFAULT_REMINDER_INTERVAL_MINUTES
+        ))
+    except (ValueError, TypeError, AttributeError):
+        interval = DEFAULT_REMINDER_INTERVAL_MINUTES
+    if interval < MIN_REMINDER_INTERVAL_MINUTES:
+        interval = MIN_REMINDER_INTERVAL_MINUTES
+    if interval > MAX_REMINDER_INTERVAL_MINUTES:
+        interval = MAX_REMINDER_INTERVAL_MINUTES
+    return enabled, interval
+
+
 def get_settings(data):
     settings = data.get("_settings", {})
     if not isinstance(settings, dict):
         settings = {}
+    reminders_enabled, reminder_interval = _get_reminder_settings(data)
     return {
         "show_weekly": settings.get("show_weekly", True),
         "show_apps": settings.get("show_apps", True),
         "show_app_icons": settings.get("show_app_icons", True),
         "app_mode": settings.get("app_mode", "class"),
         "retention_days": settings.get("retention_days", 365),
+        "screen_time_reminders": reminders_enabled,
+        "reminder_interval_minutes": reminder_interval,
     }
 
 
@@ -892,6 +1012,150 @@ def set_retention_days(value):
     print_today()
 
 
+# ── Screen time reminder state file ──────────────────────────────────
+
+def write_reminder_file(payload):
+    """Atomically publish the latest reminder for the floating overlay."""
+    dirname = os.path.dirname(REMINDER_FILE)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+    tmp = REMINDER_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, REMINDER_FILE)
+
+
+def clear_reminder_file():
+    """Remove any pending reminder (disable, interval change)."""
+    try:
+        if os.path.exists(REMINDER_FILE):
+            os.remove(REMINDER_FILE)
+    except OSError:
+        pass
+
+
+def read_reminder_file():
+    """Return the persisted reminder dict, or {} when absent/corrupt."""
+    try:
+        if not os.path.exists(REMINDER_FILE):
+            return {}
+        with open(REMINDER_FILE, "r") as f:
+            obj = json.load(f)
+        return obj if isinstance(obj, dict) else {}
+    except (OSError, ValueError):
+        return {}
+    except Exception:
+        return {}
+
+
+def toggle_reminders():
+    """Enable/disable screen time reminders."""
+    enabled, _ = _get_reminder_settings(load_data())
+
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["screen_time_reminders"] = not enabled
+        data["_settings"] = settings
+        # Discard a reminder that is on screen right now so disabling takes
+        # effect immediately rather than after the freshness window lapses.
+        reminders = data.get("_reminders")
+        if isinstance(reminders, dict):
+            reminders["session_app"] = ""
+            reminders["session_seconds"] = 0
+
+    update_state(mutate)
+    if not enabled:  # we just disabled it
+        clear_reminder_file()
+    print_today()
+
+
+def set_reminder_interval(value):
+    """Set the continuous-use interval, in minutes, that triggers a reminder."""
+    try:
+        minutes = int(str(value).strip())
+    except (ValueError, TypeError, AttributeError):
+        print(
+            "invalid reminder interval: %r (expected int minutes)" % (value,),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if minutes < MIN_REMINDER_INTERVAL_MINUTES:
+        minutes = MIN_REMINDER_INTERVAL_MINUTES
+    if minutes > MAX_REMINDER_INTERVAL_MINUTES:
+        minutes = MAX_REMINDER_INTERVAL_MINUTES
+
+    def mutate(data):
+        settings = data.get("_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["reminder_interval_minutes"] = minutes
+        data["_settings"] = settings
+        # A new interval starts a fresh continuous-use session.
+        reminders = data.get("_reminders")
+        if isinstance(reminders, dict):
+            reminders["session_app"] = ""
+            reminders["session_seconds"] = 0
+
+    update_state(mutate)
+    clear_reminder_file()
+    print_today()
+
+
+def get_fresh_reminder(data):
+    """Return a validated, fresh reminder payload or {}.
+
+    Shared by the `reminder` command and by print_today(), so the service can
+    read the reminder straight from its existing 5s ticker instead of running
+    a second Python process on the same cadence.
+    """
+    enabled, interval = _get_reminder_settings(data)
+    if not enabled:
+        return {}
+    reminder = read_reminder_file()
+    if not reminder:
+        return {}
+    app = reminder.get("app")
+    nonce = reminder.get("nonce")
+    created = reminder.get("created")
+    seconds = reminder.get("app_seconds", 0)
+    if not isinstance(app, str) or not app:
+        return {}
+    if isinstance(nonce, bool) or not isinstance(nonce, (int, float)):
+        return {}
+    if isinstance(created, bool) or not isinstance(created, (int, float)):
+        return {}
+    if isinstance(seconds, bool) or not isinstance(seconds, int):
+        seconds = 0
+    try:
+        age = time.time() - float(created)
+    except (ValueError, TypeError, OverflowError):
+        age = REMINDER_MAX_AGE_SECONDS + 1
+    if age < 0 or age > REMINDER_MAX_AGE_SECONDS:
+        return {}
+    # The overlay renders this as Text.PlainText already; stripping angle
+    # brackets too keeps a hostile window class (e.g. Steam titles) from ever
+    # carrying markup-shaped text into the renderer.
+    display = (clean_app_name(app) or app).replace("<", "").replace(">", "")
+    return {
+        "app": display[:MAX_APP_NAME_LENGTH],
+        "app_seconds": max(0, int(seconds)),
+        "interval_minutes": int(interval),
+        "nonce": nonce,
+        "created": created,
+    }
+
+
+def print_reminder():
+    """Print the current, fresh reminder or {} for the floating overlay."""
+    print(json.dumps(get_fresh_reminder(load_data())))
+
+
 def get_week_data(data):
     """The last 7 days, newest last, with the screen seconds of each day."""
     now = datetime.datetime.now()
@@ -966,26 +1230,29 @@ def print_today():
         "show_apps": settings["show_apps"],
         "show_app_icons": settings["show_app_icons"],
         "retention_days": settings["retention_days"],
+        "screen_time_reminders": settings["screen_time_reminders"],
+        "reminder_interval_minutes": settings["reminder_interval_minutes"],
+        "reminder": get_fresh_reminder(data),
         "apps_today": apps_today,
     }))
 
 
-def _format_week_label(monday, sunday):
-    weeknum = monday.isocalendar()[1]
-    mon_name = MONTH_ABBR[monday.month - 1]
-    sun_name = MONTH_ABBR[sunday.month - 1]
-    if monday.year == sunday.year and monday.month == sunday.month:
+def _format_week_label(start, end, weeknum):
+    """Format a Sunday-to-Saturday week range with its week number."""
+    start_name = MONTH_ABBR[start.month - 1]
+    end_name = MONTH_ABBR[end.month - 1]
+    if start.year == end.year and start.month == end.month:
         core = "%s %d \u2013 %d, %d" % (
-            mon_name, monday.day, sunday.day, sunday.year
+            start_name, start.day, end.day, end.year
         )
-    elif monday.year == sunday.year:
+    elif start.year == end.year:
         core = "%s %d \u2013 %s %d, %d" % (
-            mon_name, monday.day, sun_name, sunday.day, sunday.year
+            start_name, start.day, end_name, end.day, end.year
         )
     else:
         core = "%s %d, %d \u2013 %s %d, %d" % (
-            mon_name, monday.day, monday.year,
-            sun_name, sunday.day, sunday.year,
+            start_name, start.day, start.year,
+            end_name, end.day, end.year,
         )
     return "%s \u00b7 W%d" % (core, weeknum)
 
@@ -1004,16 +1271,21 @@ def apps_week(offset=0):
     retention = _get_retention_days(data)
 
     today = datetime.date.today()
-    monday_this = today - datetime.timedelta(days=today.weekday())
-    monday = monday_this + datetime.timedelta(weeks=off)
-    sunday = monday + datetime.timedelta(days=6)
-
-    week_label = _format_week_label(monday, sunday)
+    # Weeks run Sunday -> Saturday (rather than ISO Monday -> Sunday), so a
+    # day's screen time lands in the same week the user thinks of it in and
+    # past weeks line up with the calendar.
+    sunday_this = today - datetime.timedelta(days=(today.weekday() + 1) % 7)
+    start = sunday_this + datetime.timedelta(weeks=off)
+    end = start + datetime.timedelta(days=6)
+    # Use the ISO week of the Monday inside this Sun-Sat range so the W##
+    # label matches the one the rest of the system shows.
+    weeknum = (start + datetime.timedelta(days=1)).isocalendar()[1]
+    week_label = _format_week_label(start, end, weeknum)
 
     days = []
     week_total = 0
     for i in range(7):
-        d = monday + datetime.timedelta(days=i)
+        d = start + datetime.timedelta(days=i)
         date_str = d.isoformat()
         label = d.strftime("%a")
         day_data = data.get(date_str, {})
@@ -1078,6 +1350,15 @@ if __name__ == "__main__":
                 print("usage: tracker.py set-retention-days <1..365>", file=sys.stderr)
                 sys.exit(1)
             set_retention_days(sys.argv[2])
+        elif cmd in ("toggle-reminders", "toggle_reminders", "toggle-reminder", "toggle_reminder"):
+            toggle_reminders()
+        elif cmd in ("set-reminder-interval", "set_reminder_interval", "set-reminder", "set_reminder"):
+            if len(sys.argv) < 3:
+                print("usage: tracker.py set-reminder-interval <1..240 minutes>", file=sys.stderr)
+                sys.exit(1)
+            set_reminder_interval(sys.argv[2])
+        elif cmd in ("reminder", "get-reminder", "get_reminder"):
+            print_reminder()
         elif cmd in ("apps-week", "apps_week", "appsweek"):
             offset = sys.argv[2] if len(sys.argv) > 2 else "0"
             apps_week(offset)

@@ -4,7 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// WeekChart — self-contained weekly overview (Mon–Sun) with a basis
+// WeekChart — self-contained weekly overview (Sun–Sat) with a basis
 // switch: FOCUSED (seconds attributed to the focused app) or OVERALL
 // (all screen-on time, including time with no app attributed).
 // Data contract: `tracker.py apps-week <offset>` prints
@@ -72,29 +72,24 @@ Column {
     return Math.max(3600, m)
   }
 
-  readonly property real axisW: Style.space(44)
+  readonly property real axisW: Style.space(56)
   readonly property real barsW: Math.max(1, width - root.axisW)
 
   function formatTime(sec) {
     var s = Math.floor(sec || 0)
     if (s <= 0)
       return "0m"
-    var mins = Math.floor(s / 60)
+    var mins = Math.round(s / 60)
     var h = Math.floor(mins / 60)
     var mm = mins % 60
     if (h > 0)
-      return h + "h " + mm + "m"
+      return mm > 0 ? h + "h " + mm + "m" : h + "h"
     return mm + "m"
   }
 
-  // Compact label for the narrow day columns: "11.8h", "45m", "0m".
+  // Plain hours-and-minutes in every label — "7h 36m", not "7.6h".
   function dayHours(sec) {
-    var s = Math.floor(sec || 0)
-    if (s <= 0)
-      return "0m"
-    if (s < 3600)
-      return Math.floor(s / 60) + "m"
-    return (s / 3600).toFixed(1) + "h"
+    return root.formatTime(sec)
   }
 
   function refresh() {
@@ -118,7 +113,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       // U+F0141 chevron-left (same glyph as clock panel "Previous month").
-      iconText: ""
+      iconText: "󰅁"
       tooltipText: "Previous week"
       foreground: root.foreground
       fontFamily: root.fontFamily
@@ -130,7 +125,7 @@ Column {
       anchors.left: prevButton.right
       anchors.verticalCenter: parent.verticalCenter
       // U+F0142 chevron-right (same glyph as clock panel "Next month").
-      iconText: ""
+      iconText: "󰅂"
       tooltipText: "Next week"
       foreground: root.foreground
       fontFamily: root.fontFamily
@@ -198,7 +193,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       iconText: "?"
-      tooltipText: "Weekly totals, Monday to Sunday. Focused counts only seconds attributed to the focused app; overall is all screen-on time (display on, session unlocked). Click a bar to inspect that day."
+      tooltipText: "Weekly totals, Sunday to Saturday. Focused counts only seconds attributed to the focused app; overall is all screen-on time (display on, session unlocked). Click a bar to inspect that day."
       foreground: root.foreground
       fontFamily: root.fontFamily
     }
